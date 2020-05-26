@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="content">
+            <block class="Magento\Vault\Block\Customer\CreditCards" name="vault.cards.list" cacheable="false" template="Payments_SecureAcceptance::cards_list.phtml"/>
+            <referenceBlock name="vault.cards.list">
+                <block class="Payments\SecureAcceptance\Block\Customer\CardRenderer" name="payments_sa.card.renderer" template="Payments_SecureAcceptance::customer_account/credit_card.phtml"/>
+            </referenceBlock>
+        </referenceContainer>
+    </body>
+</page>

@@ -1,0 +1,15 @@
+<?php
+
+?>
+<script type="text/javascript">
+
+    require.config({
+        paths: {
+            "flex-microform": '<?php echo $block->isSandbox()
+                ? '{{testFlexUrl}}'
+                : '{{flexUrl}}'; ?>'
+        }
+    });
+
+</script>
+

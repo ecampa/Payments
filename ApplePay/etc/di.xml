@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- Payment Method Facade configuration -->
+    <virtualType name="PaymentsApplePayFacade" type="Magento\Payment\Model\Method\Adapter">
+        <arguments>
+            <argument name="code" xsi:type="const">Payments\ApplePay\Model\Ui\ConfigProvider::APPLEPAY_CODE</argument>
+            <argument name="formBlockType" xsi:type="string">Payments\ApplePay\Block\Form</argument>
+            <argument name="infoBlockType" xsi:type="string">Payments\ApplePay\Block\Info</argument>
+            <argument name="valueHandlerPool" xsi:type="object">PaymentsApplePayValueHandlerPool</argument>
+            <argument name="commandPool" xsi:type="object">PaymentsApplePayCommandPool</argument>
+        </arguments>
+    </virtualType>
+    <!-- Configuration reader -->
+    <type name="Payments\ApplePay\Gateway\Config\Config">
+        <arguments>
+            <argument name="pathPattern" xsi:type="const">Magento\Payment\Gateway\Config\Config::DEFAULT_PATH_PATTERN</argument>
+            <argument name="methodCode" xsi:type="const">Payments\ApplePay\Model\Ui\ConfigProvider::APPLEPAY_CODE</argument>
+        </arguments>
+    </type>
+    <!-- Commands infrastructure -->
+    <virtualType name="PaymentsApplePayCommandPool" type="Magento\Payment\Gateway\Command\CommandPool">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="authorize" xsi:type="string">PaymentsApplePayAuthorizeCommand</item>
+                <item name="capture" xsi:type="string">PaymentsApplePayCaptureStrategyCommand</item>
+                <item name="settlement" xsi:type="string">PaymentsApplePayPaymentGatewayCaptureCommand</item>
+                <item name="sale" xsi:type="string">PaymentsApplePaySaleCommand</item>
+                <item name="void" xsi:type="string">PaymentsApplePayPaymentGatewayVoidCommand</item>
+                <item name="cancel" xsi:type="string">PaymentsApplePayPaymentGatewayVoidCommand</item>
+                <item name="refund" xsi:type="string">PaymentsApplePayPaymentGatewayRefundCommand</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsApplePayCaptureStrategyCommand" type="Payments\ApplePay\Gateway\Command\CaptureStrategyCommand">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">PaymentsApplePayCommandPool</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Authorize command -->
+    <virtualType name="PaymentsApplePayAuthorizeCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\ApplePay\Gateway\Request\AuthorizeRequest</argument>
+            <argument name="handler" xsi:type="object">Payments\ApplePay\Gateway\Response\AuthorizeResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\ApplePay\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\ApplePay\Gateway\Validator\ResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\ApplePay\Gateway\Http\Client\SOAPClient</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Authorization Request -->
+    <type name="Payments\ApplePay\Gateway\Request\AuthorizeRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\ApplePay\Gateway\Config\Config</argument>
+        </arguments>
+    </type>
+
+    <!-- Capture command -->
+    <virtualType name="PaymentsApplePayPaymentGatewayCaptureCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\ApplePay\Gateway\Request\CaptureRequest</argument>
+            <argument name="handler" xsi:type="object">Payments\ApplePay\Gateway\Response\CaptureResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\ApplePay\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\ApplePay\Gateway\Validator\ResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\ApplePay\Gateway\Http\Client\SOAPClient</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Capture Request -->
+    <type name="Payments\ApplePay\Gateway\Request\CaptureRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\ApplePay\Gateway\Config\Config</argument>
+        </arguments>
+    </type>
+
+    <!-- Sale command -->
+    <virtualType name="PaymentsApplePaySaleCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsApplePaySaleRequest</argument>
+            <argument name="handler" xsi:type="object">Payments\ApplePay\Gateway\Response\SaleResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\ApplePay\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\ApplePay\Gateway\Validator\ResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\ApplePay\Gateway\Http\Client\SOAPClient</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Sale Request -->
+    <virtualType name="PaymentsApplePaySaleRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="authorize" xsi:type="string">Payments\ApplePay\Gateway\Request\AuthorizeRequest</item>
+                <item name="settlement" xsi:type="string">Payments\ApplePay\Gateway\Request\SettlementRequest</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\ApplePay\Gateway\Request\SettlementRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\ApplePay\Gateway\Config\Config</argument>
+        </arguments>
+    </type>
+
+    <!-- Void command -->
+    <virtualType name="PaymentsApplePayPaymentGatewayVoidCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\ApplePay\Gateway\Request\VoidRequest</argument>
+            <argument name="handler" xsi:type="object">Payments\ApplePay\Gateway\Response\VoidResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\ApplePay\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\ApplePay\Gateway\Validator\ResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\ApplePay\Gateway\Http\Client\SOAPClient</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Void Request -->
+    <type name="Payments\ApplePay\Gateway\Request\VoidRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\ApplePay\Gateway\Config\Config</argument>
+        </arguments>
+    </type>
+
+    <!-- Refund command -->
+    <virtualType name="PaymentsApplePayPaymentGatewayRefundCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\ApplePay\Gateway\Request\RefundRequest</argument>
+            <argument name="handler" xsi:type="object">Payments\ApplePay\Gateway\Response\RefundResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\ApplePay\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\ApplePay\Gateway\Validator\ResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\ApplePay\Gateway\Http\Client\SOAPClient</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Refund Request -->
+    <type name="Payments\ApplePay\Gateway\Request\RefundRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\ApplePay\Gateway\Config\Config</argument>
+        </arguments>
+    </type>
+    
+    <virtualType name="PaymentsApplePayValueHandlerPool" type="Magento\Payment\Gateway\Config\ValueHandlerPool">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="default" xsi:type="string">PaymentsApplePayConfigValueHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsApplePayConfigValueHandler" type="Magento\Payment\Gateway\Config\ConfigValueHandler">
+        <arguments>
+            <argument name="configInterface" xsi:type="object">Payments\ApplePay\Gateway\Config\Config</argument>
+        </arguments>
+    </virtualType>
+</config>

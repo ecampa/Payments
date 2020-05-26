@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- Configuration reader -->
+    <type name="Payments\PayPal\Model\Config">
+        <arguments>
+            <argument name="pathPattern" xsi:type="const">Magento\Payment\Gateway\Config\Config::DEFAULT_PATH_PATTERN</argument>
+            <argument name="methodCode" xsi:type="const">Payments\PayPal\Model\Config::CODE</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\PayPal\Block\Express\Shortcut">
+        <arguments>
+            <argument name="paymentMethodCode" xsi:type="const">Payments\PayPal\Model\Config::CODE</argument>
+            <argument name="startAction" xsi:type="string">paymentspaypal/express/start/button/1</argument>
+            <argument name="checkoutType" xsi:type="string">Magento\Paypal\Model\Express\Checkout</argument>
+            <argument name="alias" xsi:type="string">product.info.addtocart.paypal</argument>
+            <argument name="shortcutTemplate" xsi:type="string">express/shortcut.phtml</argument>
+            <argument name="shortcutValidator" xsi:type="object">Payments\PayPal\Helper\Shortcut\Validator</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\PayPal\Block\Bml\Shortcut">
+        <arguments>
+            <argument name="paymentMethodCode" xsi:type="const">Payments\PayPal\Model\Config::CODE</argument>
+            <argument name="startAction" xsi:type="string">paymentspaypal/bml/start/button/1</argument>
+            <argument name="bmlMethodCode" xsi:type="const">Payments\PayPal\Model\Config::CODE_CREDIT</argument>
+            <argument name="alias" xsi:type="string">product.info.addtocart.paypalbml</argument>
+            <argument name="shortcutTemplate" xsi:type="string">express/shortcut.phtml</argument>
+            <argument name="shortcutValidator" xsi:type="object">Payments\PayPal\Helper\Shortcut\Validator</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\PayPal\Block\Express\InContext\Minicart\Button">
+        <arguments>
+            <argument name="data" xsi:type="array">
+                <item name="template" xsi:type="string">Payments_PayPal::express/in-context/shortcut/button.phtml</item>
+                <item name="alias" xsi:type="string">paypal.express-in-context.mini-cart</item>
+                <item name="button_id" xsi:type="string">paypal-express-in-context-mini-cart</item>
+                <item name="link_data_action" xsi:type="string">paypal-in-context-checkout</item>
+            </argument>
+            <argument name="payment" xsi:type="object">Payments\PayPal\Model\Payment</argument>
+        </arguments>
+    </type>
+    
+    <type name="Payments\Core\Helper\Data">
+        <arguments>
+            <argument name="additionalInfoKeys" xsi:type="array">
+                <item name="paypal_customer_email" xsi:type="const">Payments\PayPal\Model\Express\Checkout::PAYMENT_INFO_TRANSPORT_PAYER_EMAIL</item>
+            </argument>
+        </arguments>
+    </type>
+    
+    <!-- Vault payment -->
+    
+    <!-- Vault sale command -->
+    <virtualType name="PaymentsPayPalVaultSaleCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\PayPal\Gateway\Request\VaultSaleRequestBuilder</argument>
+            <argument name="handler" xsi:type="object">Payments\PayPal\Gateway\Response\VaultResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\PayPal\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\PayPal\Gateway\Validator\VaultReasonCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\PayPal\Gateway\Http\Client\SOAPClient</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Commands infrastructure -->
+    <virtualType name="PaymentsPayPalCommandPool" type="Magento\Payment\Gateway\Command\CommandPool">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="vault_sale" xsi:type="string">PaymentsPayPalVaultSaleCommand</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Vault payment facade -->
+    <virtualType name="PaymentsPayPalVaultFacade" type="Magento\Vault\Model\Method\Vault">
+        <arguments>
+            <argument name="config" xsi:type="object">PaymentsPayPalVaultPaymentConfig</argument>
+            <argument name="valueHandlerPool" xsi:type="object">PaymentsPayPalValueHandlerPool</argument>
+            <argument name="vaultProvider" xsi:type="object">Payments\PayPal\Model\Payment</argument>
+            <argument name="code" xsi:type="const">Payments\PayPal\Model\Config::CODE_VAULT</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsPayPalValueHandlerPool" type="VaultPaymentValueHandlerPool">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="default" xsi:type="string">PaymentsPayPalVaultPaymentValueHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsPayPalVaultPaymentConfig" type="Magento\Payment\Gateway\Config\Config">
+        <arguments>
+            <argument name="methodCode" xsi:type="const">Payments\PayPal\Model\Config::CODE_VAULT</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsPayPalVaultPaymentValueHandler" type="VaultPaymentDefaultValueHandler">
+        <arguments>
+            <argument name="configInterface" xsi:type="object">PaymentsPayPalVaultPaymentConfig</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Vault command manager -->
+    <virtualType name="PaymentsPayPalCommandManager" type="Magento\Payment\Gateway\Command\CommandManager">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">PaymentsPayPalCommandPool</argument>
+        </arguments>
+    </virtualType>
+    <type name="Magento\Payment\Gateway\Command\CommandManagerPool">
+        <arguments>
+            <argument name="executors" xsi:type="array">
+                <item name="payments_paypal" xsi:type="string">PaymentsPayPalCommandManager</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <type name="Magento\Vault\Model\Method\Vault">
+        <plugin name="payments-paypal-vault-plugin" type="Payments\PayPal\Plugin\Vault\Model\Method\VaultPlugin"/>
+    </type>
+
+    <type name="Payments\Core\Cron\DecisionManagerReport">
+        <arguments>
+            <argument name="transactionProcessors" xsi:type="array">
+                <item name="payments_paypal" xsi:type="object">Payments\PayPal\Model\DmProcessor</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!--<type name="Magento\Vault\Controller\Cards\DeleteAction">
+        <plugin name="payments-paypal-vault-token-delete-plugin" type="Payments\PayPal\Plugin\Controller\Cards\DeleteTokenPlugin"/>
+    </type>-->
+
+</config>

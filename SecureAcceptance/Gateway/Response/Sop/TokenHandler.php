@@ -1,0 +1,85 @@
+<?php
+namespace Payments\SecureAcceptance\Gateway\Response\Sop;
+
+use Magento\Vault\Model\Ui\VaultConfigProvider;
+
+class TokenHandler implements \Magento\Payment\Gateway\Response\HandlerInterface
+{
+
+    const KEY_PAYMENT_TOKEN = 'payment_token';
+
+    /**
+     * @var \Payments\SecureAcceptance\Gateway\Helper\SubjectReader
+     */
+    private $subjectReader;
+
+    /**
+     * @var \Payments\SecureAcceptance\Model\PaymentTokenManagement
+     */
+    private $paymentTokenManagement;
+
+    public function __construct(
+        \Payments\SecureAcceptance\Gateway\Helper\SubjectReader $subjectReader,
+        \Payments\SecureAcceptance\Model\PaymentTokenManagement $paymentTokenManagement
+    ) {
+        $this->subjectReader = $subjectReader;
+        $this->paymentTokenManagement = $paymentTokenManagement;
+    }
+
+    /**
+     * Stores payment token into payment object
+     *
+     * @param array $handlingSubject
+     * @param array $response
+     * @return void
+     */
+    public function handle(array $handlingSubject, array $response)
+    {
+
+        $paymentDO = $this->subjectReader->readPayment($handlingSubject);
+        $payment = $paymentDO->getPayment();
+
+        $token = $response[self::KEY_PAYMENT_TOKEN] ?? null;
+
+        if (!$token) {
+            return;
+        }
+
+        $this->paymentTokenManagement->storeTokenIntoPayment($payment, $token);
+
+        if (!$payment->getAdditionalInformation(VaultConfigProvider::IS_ACTIVE_CODE)) {
+            return;
+        }
+
+        $tokenData = $this->buildTokenToSave($response);
+
+        if ($tokenData !== null) {
+            $payment->setAdditionalInformation(\Payments\SecureAcceptance\Gateway\Response\AbstractResponseHandler::TOKEN_DATA, $tokenData);
+        }
+    }
+
+    /**
+     * @param $response
+     * @return array
+     */
+    private function buildTokenToSave($response)
+    {
+        $cardType = isset($response['req_card_type']) ? $response['req_card_type'] : '';
+        $cardNumber = $response['req_card_number'];
+        $ccLastFour = "****-****-****-" . substr($cardNumber, -4);
+        $cardExpiry = isset($response['req_card_expiry_date']) ? $response['req_card_expiry_date'] : '';
+
+        $result = [
+            'payment_token' => $response['payment_token'],
+            'card_type' => $cardType,
+            'cc_last4' => $ccLastFour,
+            'card_expiry_date' => $cardExpiry
+        ];
+
+        if (preg_match('/^([0-9]{6}).+/', $cardNumber, $matches)) {
+            $result['card_bin'] = $matches[1];
+        }
+
+        return $result;
+    }
+}

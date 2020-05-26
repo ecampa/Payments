@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <payment>
+            <payments_paypal>
+                <active>0</active>
+                <model>Payments\PayPal\Model\Payment</model>
+                <title>PayPal</title>
+                <order_status>processing</order_status>
+                <paypal_payment_action>authorize_capture</paypal_payment_action>
+                <paypal_redirection_type>traditional</paypal_redirection_type>
+                <paypal_test_mode>1</paypal_test_mode>
+                <paypal_allowspecific>0</paypal_allowspecific>
+                <paypal_credit_title>PayPal Credit</paypal_credit_title>
+                <can_capture_vault>1</can_capture_vault>
+            </payments_paypal>
+            <payments_paypal_credit>
+                <title>PayPal Credit</title>
+                <active>1</active>
+                <model>Payments\PayPal\Model\Credit</model>
+            </payments_paypal_credit>
+            <payments_paypal_vault>
+                <title>PayPal Billing Agreements</title>
+                <active>1</active>
+                <model>PaymentsPayPalVaultFacade</model>
+                <can_use_internal>1</can_use_internal>
+            </payments_paypal_vault>
+        </payment>
+    </default>
+</config>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager:etc/config.xsd">
+    <preference for="Magento\Tax\Model\Sales\Total\Quote\Tax" type="Payments\Tax\Model\Tax\Sales\Total\Quote\Tax"/>
+
+    <!-- Tax logger configuration -->
+    <virtualType name="PaymentsTaxLog" type="Payments\Core\Model\Logger">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="payments" xsi:type="object">PaymentsTaxLogHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsTaxLogHandler" type="Magento\Framework\Logger\Handler\Base">
+        <arguments>
+            <argument name="fileName" xsi:type="string">/var/log/payments.tax.log</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Injecting logger -->
+    <type name="Payments\Tax\Service\GatewaySoapApi">
+        <arguments>
+            <argument name="logger" xsi:type="object">PaymentsTaxLog</argument>
+            <argument name="serializer" xsi:type="object">Payments\Core\Serialize\JsonObjectSerializer</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\Tax\Model\Tax\Sales\Total\Quote\Tax">
+        <arguments>
+            <argument name="serializer" xsi:type="object">Payments\Core\Serialize\JsonObjectSerializer</argument>
+        </arguments>
+    </type>
+
+</config>

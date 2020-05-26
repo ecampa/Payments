@@ -1,0 +1,76 @@
+define([
+    'jquery',
+    'Magento_Payment/js/view/payment/iframe',
+    'Magento_Checkout/js/model/payment/additional-validators',
+    'Magento_Checkout/js/action/set-payment-information',
+    'Magento_Checkout/js/model/full-screen-loader',
+    'Magento_Vault/js/view/payment/vault-enabler'
+], function ($, Component, additionalValidators, setPaymentInformationAction, fullScreenLoader, VaultEnabler) {
+
+    return Component.extend({
+        defaults: {
+            active: false,
+            template: 'Payments_SecureAcceptance/payment/iframe',
+            code: 'payments_sa'
+        },
+        initialize: function () {
+            this._super();
+            this.vaultEnabler = new VaultEnabler();
+            this.vaultEnabler.setPaymentCode(this.getVaultCode());
+        },
+        isActive: function () {
+            return true;
+        },
+        getData: function () {
+            var data = {
+                'method': this.getCode()
+            };
+
+            this.vaultEnabler.visitAdditionalData(data);
+
+            return data;
+        },
+        isVaultEnabled: function () {
+            return this.vaultEnabler.isVaultEnabled();
+        },
+        getVaultCode: function () {
+            return window.checkoutConfig.payment[this.getCode()].vaultCode;
+        },
+        getCode: function () {
+            return this.code;
+        },
+        context: function () {
+            return this;
+        },
+        setPlaceOrderHandler: function (handler) {
+            this.placeOrderHandler = handler;
+        },
+        setValidateHandler: function (handler) {
+            this.validateHandler = handler;
+        },
+        placeOrder: function () {
+            if (this.validateHandler() && additionalValidators.validate()) {
+
+                fullScreenLoader.startLoader();
+
+                this.isPlaceOrderActionAllowed(false);
+
+                $.when(
+                    setPaymentInformationAction(this.messageContainer, this.getData())
+                )
+                    .done(this.done.bind(this))
+                    .fail(this.fail.bind(this))
+                    .always(
+                        function () {
+                            this.isPlaceOrderActionAllowed(true);
+                        }.bind(this)
+                    )
+                ;
+
+                this.initTimeoutHandler();
+            }
+        }
+    });
+
+
+});

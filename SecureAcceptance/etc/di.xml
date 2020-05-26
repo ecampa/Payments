@@ -1,0 +1,686 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <preference for="\Magento\Payment\Gateway\Command\CommandPoolInterface" type="\Magento\Payment\Gateway\Command\CommandPool"/>
+
+    <!-- Payment Method Facade configuration -->
+    <virtualType name="PaymentsSAGatewayFacade" type="Magento\Payment\Model\Method\Adapter">
+        <arguments>
+            <argument name="code" xsi:type="const">\Payments\SecureAcceptance\Model\Ui\ConfigProvider::CODE</argument>
+            <argument name="formBlockType" xsi:type="string">Magento\Payment\Block\Form</argument>
+            <argument name="infoBlockType" xsi:type="string">Magento\Payment\Block\Info</argument>
+            <argument name="valueHandlerPool" xsi:type="object">PaymentsSAGatewayValueHandlerPool</argument>
+            <argument name="commandPool" xsi:type="object">PaymentsSAGatewayCommandPool</argument>
+            <argument name="validatorPool" xsi:type="object">PaymentsSecureAcceptanceValidatorPool</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Configuration reader -->
+    <type name="Payments\SecureAcceptance\Gateway\Config\Config">
+        <arguments>
+            <argument name="pathPattern" xsi:type="const">Magento\Payment\Gateway\Config\Config::DEFAULT_PATH_PATTERN</argument>
+            <argument name="methodCode" xsi:type="const">Payments\SecureAcceptance\Model\Ui\ConfigProvider::CODE</argument>
+        </arguments>
+    </type>
+
+    <!-- Commands infrastructure -->
+    <virtualType name="PaymentsSAGatewayCommandPool" type="Magento\Payment\Gateway\Command\CommandPool">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="create_token" xsi:type="string">Payments\SecureAcceptance\Gateway\Command\TokenCreateRequestCommand</item>
+                <item name="process_token" xsi:type="string">Payments\SecureAcceptance\Gateway\Command\TokenHandleResponseCommand</item>
+                <item name="authorize" xsi:type="string">PaymentsSAGatewayAuthorizeStrategyCommand</item>
+                <item name="authorize_soap" xsi:type="string">PaymentsSAGatewaySoapAuthorizeCommand</item>
+                <item name="authorize_legacy" xsi:type="string">PaymentsSAGatewayAuthorizeCommand</item>
+                <item name="capture" xsi:type="string">PaymentsSACaptureStrategyCommand</item>
+                <item name="settlement" xsi:type="string">PaymentsSAGatewaySoapCaptureCommand</item>
+                <item name="sale" xsi:type="string">PaymentsSAGatewaySaleStrategyCommand</item>
+                <item name="sale_soap" xsi:type="string">PaymentsSAGatewaySoapSaleCommand</item>
+                <item name="sale_legacy" xsi:type="string">PaymentsSASaleCommand</item>
+                <item name="subscription_retrieve" xsi:type="string">Payments\SecureAcceptance\Gateway\Command\RetrieveSubscriptionCommand</item>
+                <item name="void" xsi:type="string">PaymentsSAGatewayCancelCommand</item>
+                <item name="void_payment" xsi:type="string">PaymentsSAGatewayVoidCommand</item>
+                <item name="cancel" xsi:type="string">PaymentsSAGatewayCancelCommand</item>
+                <item name="refund" xsi:type="string">PaymentsSAGatewayRefundCommand</item>
+                <item name="vault_refund" xsi:type="string">PaymentsSAGatewayRefundCommand</item>
+                <item name="vault_authorize" xsi:type="string">PaymentsSAGatewaySoapVaultAuthorizeCommand</item>
+                <item name="vault_sale" xsi:type="string">PaymentsSAGatewaySoapVaultSaleCommand</item>
+                <item name="generate_flex_key" xsi:type="string">Payments\SecureAcceptance\Gateway\Command\Flex\GenerateKeyCommand</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\SecureAcceptance\Gateway\Command\LegacyStrategyCommand">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">PaymentsSAGatewayCommandPool</argument>
+            <argument name="config" xsi:type="object">Payments\SecureAcceptance\Gateway\Config\Config</argument>
+        </arguments>
+    </type>
+
+    <virtualType name="PaymentsSAGatewayAuthorizeStrategyCommand" type="Payments\SecureAcceptance\Gateway\Command\LegacyStrategyCommand">
+        <arguments>
+            <argument name="command" xsi:type="string">authorize_soap</argument>
+            <argument name="legacyCommand" xsi:type="string">authorize_legacy</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewaySaleStrategyCommand" type="Payments\SecureAcceptance\Gateway\Command\LegacyStrategyCommand">
+        <arguments>
+            <argument name="command" xsi:type="string">sale_soap</argument>
+            <argument name="legacyCommand" xsi:type="string">sale_legacy</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSACaptureStrategyCommand" type="Payments\SecureAcceptance\Gateway\Command\CaptureStrategyCommand">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">PaymentsSAGatewayCommandPool</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAVoidStrategyCommand" type="Payments\SecureAcceptance\Gateway\Command\VoidStrategyCommand">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">PaymentsSAGatewayCommandPool</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Authorize command -->
+    <virtualType name="PaymentsSAGatewayAuthorizeCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\SecureAcceptance\Gateway\Request\AuthorizationRequest</argument>
+            <argument name="handler" xsi:type="object">PaymentsSAAuthorizationHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\SecureAcceptance\Gateway\Validator\ResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\Client\SOAPClient</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+        </arguments>
+    </virtualType>
+
+
+    <!-- Authorize SOAP command -->
+    <virtualType name="PaymentsSAGatewaySoapAuthorizeCommand" type="PaymentsSAGatewayAuthorizeCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsSAGatewaySoapAuthorizeRequestBuilder</argument>
+            <argument name="handler" xsi:type="object">PaymentsSAGatewaySoapAuthorizationHandler</argument>
+            <argument name="validator" xsi:type="object">PaymentsSAGatewayAuthorizeValidator</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewaySoapVaultAuthorizeCommand" type="PaymentsSAGatewaySoapAuthorizeCommand"/>
+
+    <virtualType name="PaymentsSAGatewayAuthorizeValidator" type="Magento\Payment\Gateway\Validator\ValidatorComposite">
+        <arguments>
+            <argument name="validators" xsi:type="array">
+                <item name="responseCodeValidator" xsi:type="string">Payments\SecureAcceptance\Gateway\Validator\SoapReasonCodeValidator</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewaySoapAuthorizeRequestBuilder" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="merchantData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\MerchantDataBuilder</item>
+                <item name="paymentData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\PaymentDataBuilder</item>
+                <item name="addressData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\AddressDataBuilder</item>
+                <item name="itemsData" xsi:type="string">PaymentsSAGatewayAuthorizeItemsDataBuilder</item>
+                <item name="ccAuthService" xsi:type="string">PaymentsSAGatewayCcAuthServiceRequest</item>
+                <item name="mddBuilder" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\DecisionManagerMddBuilder</item>
+                <item name="subscriptionId" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\SubscriptionBuilder</item>
+                <item name="cvnBuilder" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\CvnBuilder</item>
+                <item name="businessRulesBuilder" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\BusinessRulesBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayCcAuthServiceRequest" type="Payments\SecureAcceptance\Gateway\Request\Soap\ServiceRequest">
+        <arguments>
+            <argument name="serviceName" xsi:type="string">ccAuthService</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Capture Service Request -->
+    <virtualType name="PaymentsSAGatewayCcCaptureServiceRequest" type="Payments\SecureAcceptance\Gateway\Request\Soap\ServiceRequest">
+        <arguments>
+            <argument name="serviceName" xsi:type="string">ccCaptureService</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Settlement Service Request -->
+    <virtualType name="PaymentsSAGatewayCcSettlementServiceRequest" type="PaymentsSAGatewayCcCaptureServiceRequest">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="parentTransactionIdBuilder" xsi:type="string">PaymentsSAGatewayCaptureParentTransactionIdBuilder</item>
+                <item name="captureSequenceBuilder" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\CaptureSequenceBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayCaptureParentTransactionIdBuilder" type="Payments\SecureAcceptance\Gateway\Request\Soap\ParentTransactionIdBuilder">
+        <arguments>
+            <argument name="parentTransactionName" xsi:type="string">authRequestID</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Authorize Handler -->
+    <virtualType name="PaymentsSAAuthorizationHandler" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="order" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\AuthorizeResponseHandler</item>
+                <item name="vault_details" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\VaultDetailsHandler</item>
+                <item name="raw_details" xsi:type="string">Payments\Core\Gateway\Response\RawDetailsHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewaySoapAuthorizationHandler" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="transactionDetails" xsi:type="string">PaymentsSASoapAuthorizeTransactionDetailsHandler</item>
+                <item name="additionalInfo" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\Soap\AdditionalInfoHandler</item>
+                <item name="dmDetails" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\Soap\DecisionManagerHandler</item>
+                <item name="cc_info" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\Soap\CcDataHandler</item>
+                <item name="microformTokenHandler" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\Soap\TokenHandler</item>
+                <item name="vault_details" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\VaultDetailsHandler</item>
+                <item name="vault_cc_info" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\Soap\VaultCcInfoHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSASoapAuthorizeTransactionDetailsHandler" type="Payments\SecureAcceptance\Gateway\Response\Soap\TransactionDetailsHandler">
+        <arguments>
+            <argument name="shouldCloseTransaction" xsi:type="boolean">false</argument>
+            <argument name="shouldCloseParentTransaction" xsi:type="boolean">false</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Authorization Request -->
+    <type name="Payments\SecureAcceptance\Gateway\Request\AuthorizationRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\SecureAcceptance\Gateway\Config\Config</argument>
+        </arguments>
+    </type>
+
+    <!-- Capture command -->
+    <virtualType name="PaymentsSAGatewayCaptureCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\SecureAcceptance\Gateway\Request\CaptureRequest</argument>
+            <argument name="handler" xsi:type="object">Payments\SecureAcceptance\Gateway\Response\CaptureResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\SecureAcceptance\Gateway\Validator\SoapReasonCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\Client\SOAPClient</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Capture Request -->
+    <type name="Payments\SecureAcceptance\Gateway\Request\CaptureRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\SecureAcceptance\Gateway\Config\Config</argument>
+        </arguments>
+    </type>
+
+    <!-- Sale command -->
+    <virtualType name="PaymentsSASaleCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsSASaleRequest</argument>
+            <argument name="handler" xsi:type="object">PaymentsSASaleHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\SecureAcceptance\Gateway\Validator\ResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\Client\SOAPClient</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Sale Handler -->
+    <virtualType name="PaymentsSASaleHandler" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="order" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\SaleResponseHandler</item>
+                <item name="vault_details" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\VaultDetailsHandler</item>
+                <item name="raw_details" xsi:type="string">Payments\Core\Gateway\Response\RawDetailsHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Sale Legacy Request -->
+    <virtualType name="PaymentsSASaleRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="authorize" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\AuthorizationRequest</item>
+                <item name="settlement" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\SettlementRequest</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\SecureAcceptance\Gateway\Request\SaleRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\SecureAcceptance\Gateway\Config\Config</argument>
+        </arguments>
+    </type>
+
+    <!-- Void command -->
+    <virtualType name="PaymentsSAGatewayVoidCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsSAGatewayVoidRequest</argument>
+            <argument name="handler" xsi:type="object">PaymentsSAVoidResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\SecureAcceptance\Gateway\Validator\SoapReasonCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\Client\SOAPClient</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Void Request -->
+    <virtualType name="PaymentsSAGatewayVoidRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="merchantData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\MerchantDataBuilder</item>
+                <item name="paymentData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\PaymentDataBuilder</item>
+                <item name="voidService" xsi:type="string">PaymentsSAGatewayVoidServiceRequest</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayVoidServiceRequest" type="Payments\SecureAcceptance\Gateway\Request\Soap\ServiceRequest">
+        <arguments>
+            <argument name="serviceName" xsi:type="string">voidService</argument>
+            <argument name="builders" xsi:type="array">
+                <item name="parentTransactionIdBuilder" xsi:type="string">PaymentsSAGatewayVoidParentTransactionIdBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayVoidParentTransactionIdBuilder" type="Payments\SecureAcceptance\Gateway\Request\Soap\ParentTransactionIdBuilder">
+        <arguments>
+            <argument name="parentTransactionName" xsi:type="string">voidRequestID</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Void Response -->
+    <virtualType name="PaymentsSAVoidResponseHandler" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="transactionDetails" xsi:type="string">PaymentsSAVoidTransactionDetailsHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAVoidTransactionDetailsHandler" type="Payments\SecureAcceptance\Gateway\Response\Soap\TransactionDetailsHandler">
+        <arguments>
+            <argument name="shouldCloseTransaction" xsi:type="boolean">true</argument>
+            <argument name="shouldCloseParentTransaction" xsi:type="boolean">true</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Cancel command -->
+    <virtualType name="PaymentsSAGatewayCancelCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsSAGatewayCancelRequest</argument>
+            <!-- cancel responce handler the same as void-->
+            <argument name="handler" xsi:type="object">PaymentsSAVoidResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\SecureAcceptance\Gateway\Validator\SoapReasonCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\Client\SOAPClient</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Cancel Request -->
+    <virtualType name="PaymentsSAGatewayCancelRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="merchantData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\MerchantDataBuilder</item>
+                <item name="paymentData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\PaymentDataBuilder</item>
+                <item name="cancelService" xsi:type="string">PaymentsSAGatewayCancelServiceRequest</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayCancelServiceRequest" type="Payments\SecureAcceptance\Gateway\Request\Soap\ServiceRequest">
+        <arguments>
+            <argument name="serviceName" xsi:type="string">ccAuthReversalService</argument>
+            <argument name="builders" xsi:type="array">
+                <item name="parentTransactionIdBuilder" xsi:type="string">PaymentsSAGatewayCancelParentTransactionIdBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayCancelParentTransactionIdBuilder" type="Payments\SecureAcceptance\Gateway\Request\Soap\ParentTransactionIdBuilder">
+        <arguments>
+            <argument name="parentTransactionName" xsi:type="string">authRequestID</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Refund command -->
+    <virtualType name="PaymentsSAGatewayRefundCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsSAGatewayRefundRequest</argument>
+            <argument name="handler" xsi:type="object">Payments\SecureAcceptance\Gateway\Response\RefundResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\SecureAcceptance\Gateway\Validator\SoapReasonCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\Client\SOAPClient</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Refund Request -->
+    <virtualType name="PaymentsSAGatewayRefundRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="merchantData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\MerchantDataBuilder</item>
+                <item name="paymentData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\PaymentDataBuilder</item>
+                <item name="itemsData" xsi:type="string">PaymentsSAGatewayRefundItemsDataBuilder</item>
+                <item name="ccRefundService" xsi:type="string">PaymentsSAGatewayCcRefundServiceRequest</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayRefundItemsDataBuilder" type="Payments\SecureAcceptance\Gateway\Request\Soap\ItemsDataBuilder">
+        <arguments>
+            <argument name="objectName" xsi:type="string">creditmemo</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayCcRefundServiceRequest" type="Payments\SecureAcceptance\Gateway\Request\Soap\ServiceRequest">
+        <arguments>
+            <argument name="serviceName" xsi:type="string">ccCreditService</argument>
+            <argument name="builders" xsi:type="array">
+                <item name="parentTransactionIdBuilder" xsi:type="string">PaymentsSAGatewayRefundParentTransactionIdBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayRefundParentTransactionIdBuilder" type="Payments\SecureAcceptance\Gateway\Request\Soap\ParentTransactionIdBuilder">
+        <arguments>
+            <argument name="parentTransactionName" xsi:type="string">captureRequestID</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Response handlers -->
+    <virtualType name="PaymentsSAGatewayResponseHandlerComposite" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="authorizeresponse" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\AuthorizeResponseHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Value handlers infrastructure -->
+    <virtualType name="PaymentsSAGatewayValueHandlerPool" type="Magento\Payment\Gateway\Config\ValueHandlerPool">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="default" xsi:type="string">PaymentsSAGatewayConfigValueHandler</item>
+                <item name="can_void" xsi:type="string">Payments\SecureAcceptance\Gateway\Config\CanVoidHandler</item>
+                <item name="can_cancel" xsi:type="string">Payments\SecureAcceptance\Gateway\Config\CanVoidHandler</item>
+                <item name="sandbox_flag" xsi:type="string">Payments\SecureAcceptance\Gateway\Config\SandboxFlagHandler</item>
+                <item name="cgi_url_test_mode" xsi:type="string">Payments\SecureAcceptance\Gateway\Config\CgiTestUrlHandler</item>
+                <item name="cgi_url" xsi:type="string">Payments\SecureAcceptance\Gateway\Config\CgiUrlHandler</item>
+                <item name="useccv" xsi:type="string">Payments\SecureAcceptance\Gateway\Config\UseCcvHandler</item>
+                <item name="place_order_url" xsi:type="string">Payments\SecureAcceptance\Gateway\Config\PlaceOrderUrlHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsSAGatewayConfigValueHandler" type="Magento\Payment\Gateway\Config\ConfigValueHandler">
+        <arguments>
+            <argument name="configInterface" xsi:type="object">Payments\SecureAcceptance\Gateway\Config\Config</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Vault -->
+    <virtualType name="PaymentsSAVaultPaymentConfig" type="Magento\Payment\Gateway\Config\Config">
+        <arguments>
+            <argument name="methodCode" xsi:type="const">Payments\SecureAcceptance\Model\Ui\ConfigProvider::CC_VAULT_CODE</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSACreditCardVaultFacade" type="Magento\Vault\Model\Method\Vault">
+        <arguments>
+            <argument name="config" xsi:type="object">PaymentsSAVaultPaymentConfig</argument>
+            <argument name="valueHandlerPool" xsi:type="object">PaymentsSAVaultPaymentValueHandlerPool</argument>
+            <argument name="vaultProvider" xsi:type="object">PaymentsSAGatewayFacade</argument>
+            <argument name="code" xsi:type="const">Payments\SecureAcceptance\Model\Ui\ConfigProvider::CC_VAULT_CODE</argument>
+            <argument name="commandManagerPool" xsi:type="object">PaymentsSACcVaultCommandManagerPool</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayAuthorizeItemsDataBuilder" type="Payments\SecureAcceptance\Gateway\Request\Soap\ItemsDataBuilder">
+        <arguments>
+            <argument name="objectName" xsi:type="string">order</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Capture Soap command -->
+    <virtualType name="PaymentsSAGatewaySoapCaptureCommand" type="PaymentsSAGatewaySoapAuthorizeCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsSAGatewaySoapCaptureRequestBuilder</argument>
+            <argument name="handler" xsi:type="object">Payments\SecureAcceptance\Gateway\Response\CaptureResponseHandler</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewaySoapCaptureRequestBuilder" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="merchantData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\MerchantDataBuilder</item>
+                <item name="paymentData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\PaymentDataBuilder</item>
+                <item name="itemsData" xsi:type="string">PaymentsSAGatewayCaptureItemsDataBuilder</item>
+                <item name="ccCaptureService" xsi:type="string">PaymentsSAGatewayCcSettlementServiceRequest</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayCaptureItemsDataBuilder" type="Payments\SecureAcceptance\Gateway\Request\Soap\ItemsDataBuilder">
+        <arguments>
+            <argument name="objectName" xsi:type="string">invoice</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Sale Soap Command -->
+    <virtualType name="PaymentsSAGatewaySoapSaleCommand" type="PaymentsSAGatewaySoapAuthorizeCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsSAGatewaySoapSaleRequest</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewaySoapVaultSaleCommand" type="PaymentsSAGatewaySoapSaleCommand"/>
+
+    <!-- Sale Request -->
+    <virtualType name="PaymentsSAGatewaySoapSaleRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="authorize" xsi:type="string">PaymentsSAGatewaySoapAuthorizeRequestBuilder</item>
+                <item name="capture" xsi:type="string">PaymentsSAGatewayCcCaptureServiceRequest</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSACommandManager" type="Magento\Payment\Gateway\Command\CommandManager">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">PaymentsSAGatewayCommandPool</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\SecureAcceptance\Controller\SecureAcceptance\TokenRequest">
+        <arguments>
+            <argument name="commandManager" xsi:type="object">PaymentsSACommandManager</argument>
+            <argument name="sessionManager" xsi:type="object">Magento\Checkout\Model\Session</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Controller\SecureAcceptance\TokenProcess">
+        <arguments>
+            <argument name="commandManager" xsi:type="object">PaymentsSACommandManager</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Gateway\Command\TokenCreateRequestCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\SecureAcceptance\Gateway\Request\Sop\CreateTokenRequest</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Gateway\Command\TokenHandleResponseCommand">
+        <arguments>
+            <argument name="handler" xsi:type="object">PaymentsSecureAcceptanceGatewayCreateTokenHandler</argument>
+            <argument name="validator" xsi:type="object">PaymentsSecureAcceptanceGatewayCreateTokenValidator</argument>
+        </arguments>
+    </type>
+
+    <virtualType name="PaymentsSecureAcceptanceGatewayCreateTokenValidator" type="Magento\Payment\Gateway\Validator\ValidatorComposite">
+        <arguments>
+            <argument name="validators" xsi:type="array">
+                <item name="reasonCode" xsi:type="string">\Payments\SecureAcceptance\Gateway\Validator\ResponseCodeValidator</item>
+                <item name="quote" xsi:type="string">Payments\SecureAcceptance\Gateway\Validator\Sop\QuoteValidator</item>
+                <item name="signature" xsi:type="string">Payments\SecureAcceptance\Gateway\Validator\Sop\SignatureValidator</item>
+                <item name="transactionType" xsi:type="string">Payments\SecureAcceptance\Gateway\Validator\Sop\TransactionTypeValidator</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSecureAcceptanceGatewayCreateTokenHandler" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="token" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\Sop\TokenHandler</item>
+                <item name="cc_data" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\Sop\CcDataHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSACcVaultCommandManagerPool" type="Magento\Payment\Gateway\Command\CommandManagerPool">
+        <arguments>
+            <argument name="executors" xsi:type="array">
+                <item name="payments_sa" xsi:type="string">PaymentsSACommandManager</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAVaultPaymentValueHandlerPool" type="VaultPaymentValueHandlerPool">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="default" xsi:type="string">PaymentsSAVaultPaymentValueHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAVaultPaymentValueHandler" type="VaultPaymentDefaultValueHandler">
+        <arguments>
+            <argument name="configInterface" xsi:type="object">PaymentsSAVaultPaymentConfig</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAHttpRestClient" type="Payments\Core\Gateway\Http\Client\Rest">
+        <arguments>
+            <argument name="requestMethod" xsi:type="const">Magento\Framework\HTTP\ZendClient::POST</argument>
+            <argument name="requestPath" xsi:type="string">/flex/v1/keys</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\SecureAcceptance\Gateway\Command\Flex\GenerateKeyCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\SecureAcceptance\Gateway\Request\Flex\GenerateKeyRequest</argument>
+            <argument name="validator" xsi:type="object">Payments\SecureAcceptance\Gateway\Validator\Flex\GenerateKeyResponseValidator</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\Core\Gateway\Http\TransferFactory</argument>
+            <argument name="client" xsi:type="object">PaymentsSAHttpRestClient</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Controller\Microform\TokenRequest">
+        <arguments>
+            <argument name="commandManager" xsi:type="object">PaymentsSACommandManager</argument>
+            <argument name="sessionManager" xsi:type="object">Magento\Checkout\Model\Session</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Gateway\Command\RetrieveSubscriptionCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsSASoapRetrieveSubscriptionRequest</argument>
+            <argument name="handler" xsi:type="object">PaymentsSAVoidResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\SecureAcceptance\Gateway\Validator\SoapReasonCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\Client\SOAPClient</argument>
+        </arguments>
+    </type>
+
+    <virtualType name="PaymentsSASoapRetrieveSubscriptionRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="merchantData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\MerchantDataBuilder</item>
+                <item name="ccAuthService" xsi:type="string">PaymentsSAGatewayCcSubscriptionRetrieveServiceRequest</item>
+                <item name="subscriptionId" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\SubscriptionBuilder</item>
+                <item name="mrn" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\SubscriptionRetrieveMrnBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayCcSubscriptionRetrieveServiceRequest" type="Payments\SecureAcceptance\Gateway\Request\Soap\ServiceRequest">
+        <arguments>
+            <argument name="serviceName" xsi:type="string">paySubscriptionRetrieveService</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSecureAcceptanceCountryValidator" type="Magento\Payment\Gateway\Validator\CountryValidator">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\SecureAcceptance\Gateway\Config\Config</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\SecureAcceptance\Gateway\Validator\Flex\MicroformResponseValidator">
+        <arguments>
+            <argument name="signatureValidator" xsi:type="object">Payments\SecureAcceptance\Gateway\Validator\Flex\SignatureValidator\ValidatorOpenssl</argument>
+        </arguments>
+    </type>
+
+    <virtualType name="PaymentsSecureAcceptanceGlobalValidator" type="Magento\Payment\Gateway\Validator\ValidatorComposite">
+        <arguments>
+            <argument name="validators" xsi:type="array">
+                <item name="flex_validator" xsi:type="string">Payments\SecureAcceptance\Gateway\Validator\Flex\MicroformResponseValidator</item>
+            </argument>
+            <argument name="chainBreakingValidators" xsi:type="array">
+                <item name="flex_validator" xsi:type="string">flex_validator</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Magento\Quote\Model\Quote\Payment\ToOrderPayment">
+        <plugin name="payments_sa_after_convert" type="Payments\SecureAcceptance\Plugin\Model\Quote\Payment\ToOrderPaymentPlugin"/>
+    </type>
+
+    <virtualType name="PaymentsSecureAcceptanceValidatorPool" type="Magento\Payment\Gateway\Validator\ValidatorPool">
+        <arguments>
+            <argument name="validators" xsi:type="array">
+                <item name="global" xsi:type="string">PaymentsSecureAcceptanceGlobalValidator</item>
+                <item name="country" xsi:type="string">PaymentsSecureAcceptanceCountryValidator</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\SecureAcceptance\Helper\RequestDataBuilder">
+        <plugin name="ch-sa-mode" type="Payments\SecureAcceptance\Plugin\Helper\SaModeRequestDataBuilderPlugin"/>
+        <arguments>
+            <argument name="checkoutSession" xsi:type="object">Magento\Checkout\Model\Session</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Gateway\Http\Client\SOAPClient">
+        <plugin name="transparent_data_plugin" type="Payments\SecureAcceptance\Gateway\Http\Client\TransparentResponsePlugin"/>
+    </type>
+
+    <preference for="Payments\SecureAcceptance\Model\SignatureManagementInterface" type="Payments\SecureAcceptance\Model\SignatureManagement"/>
+
+    <type name="Magento\Framework\Session\SidResolverInterface">
+        <plugin name="payments-sid-resolver" type="Payments\SecureAcceptance\Plugin\Session\SidResolverPlugin"/>
+    </type>
+
+    <type name="Payments\Core\Helper\Data">
+        <arguments>
+            <argument name="additionalInfoKeys" xsi:type="array">
+                <item name="transaction_id" xsi:type="const">Payments\SecureAcceptance\Gateway\Response\AbstractResponseHandler::TRANSACTION_ID</item>
+                <item name="reason_code" xsi:type="const">Payments\SecureAcceptance\Gateway\Response\AbstractResponseHandler::REASON_CODE</item>
+                <item name="dm_decision" xsi:type="const">Payments\SecureAcceptance\Gateway\Response\AbstractResponseHandler::DECISION</item>
+                <item name="card_type" xsi:type="string">cardNumber</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Observer\DataAssignObserver">
+        <arguments>
+            <argument name="session" xsi:type="object">Magento\Checkout\Model\Session</argument>
+        </arguments>
+    </type>
+
+</config>

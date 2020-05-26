@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <!-- Logger configuration -->
+    <preference for="Payments\Core\Model\LoggerInterface" type="Payments\Core\Model\Logger"/>
+
+    <preference for="Payments\Core\Model\Checkout\PaymentFailureRouteProviderInterface" type="Payments\Core\Model\Checkout\PaymentFailureRouteProvider"/>
+
+    <type name="Payments\Core\Model\LoggerInterface">
+        <plugin name="paymentsLoggerCensorPlugin" type="\Payments\Core\Plugin\LoggerCensorPlugin"/>
+    </type>
+
+    <type name="Payments\Core\Model\Logger">
+        <arguments>
+            <argument name="name" xsi:type="string">Gateway Logger</argument>
+            <argument name="handlers" xsi:type="array">
+                <item name="payments" xsi:type="object">PaymentsCoreLoggerHandler</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <virtualType name="PaymentsCoreLoggerHandler" type="Magento\Framework\Logger\Handler\Base">
+        <arguments>
+            <argument name="fileName" xsi:type="string">/var/log/payments.log</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\Core\Helper\Data">
+        <arguments>
+            <argument name="serializer" xsi:type="object">Payments\Core\Serialize\JsonObjectSerializer</argument>
+        </arguments>
+    </type>
+
+    <!-- Configuration reader -->
+    <type name="Payments\Core\Model\Config">
+        <arguments>
+            <argument name="pathPattern" xsi:type="const">Magento\Payment\Gateway\Config\Config::DEFAULT_PATH_PATTERN</argument>
+            <argument name="methodCode" xsi:type="const">Payments\Core\Model\Config::CODE</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\Core\Cron\DecisionManagerReport">
+        <arguments>
+            <argument name="conversionReportCommand" xsi:type="object">PaymentsCoreGatewayCommandGetConversionReportCommand</argument>
+        </arguments>
+    </type>
+
+    <type name="Magento\Framework\App\Request\CsrfValidator">
+        <plugin name="paymentsDisableCsrfValidationPlugin" type="Payments\Core\Plugin\App\Request\CsrfValidatorPlugin"/>
+    </type>
+
+    <type name="Magento\Backend\App\Request\BackendValidator">
+        <plugin name="paymentsDisableBackendCsrfValidationPlugin" type="Payments\Core\Plugin\App\Request\CsrfValidatorPlugin"/>
+    </type>
+
+    <virtualType name="PaymentsCoreGatewayCommandGetConversionReportCommand" type="Payments\Core\Gateway\Command\RestGetCommand">
+        <arguments>
+            <argument name="transferFactory" xsi:type="object">Payments\Core\Gateway\Http\TransferFactory</argument>
+            <argument name="builder" xsi:type="object">PaymentsCoreGatewayRequestRestConversionDetailsBuilder</argument>
+            <argument name="client" xsi:type="object">PaymentsCoreConversionDetailsClient</argument>
+            <argument name="validator" xsi:type="object">PaymentsCoreGatewayValidatorConversionDetailsValidator</argument>
+            <argument name="mapper" xsi:type="object">Payments\Core\Gateway\Response\ConversionDetailsMapper</argument>
+            <argument name="exceptionMessage" xsi:type="string">Failed to load conversion details report. Please verify extension configuration.</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRequestRestConversionDetailsBuilder" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="timeInterval" xsi:type="string">Payments\Core\Gateway\Request\Rest\TimeIntervalBuilder</item>
+                <item name="orgId" xsi:type="string">Payments\Core\Gateway\Request\Rest\OrganizationIdBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayValidatorConversionDetailsValidator" type="Magento\Payment\Gateway\Validator\ValidatorComposite">
+        <arguments>
+            <argument name="validators" xsi:type="array">
+                <item name="restvalidator" xsi:type="string">Payments\Core\Gateway\Validator\RestResponseCodeValidator</item>
+                <item name="conversionDetailsValidator" xsi:type="string">Payments\Core\Gateway\Validator\ConversionDetailsValidator</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreConversionDetailsClient" type="Payments\Core\Gateway\Http\Client\Rest">
+        <arguments>
+            <argument name="requestMethod" xsi:type="const">Magento\Framework\HTTP\ZendClient::GET</argument>
+            <argument name="requestPath" xsi:type="string">/reporting/v3/conversion-details</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreSecureFileShareGetListCommand" type="Payments\Core\Gateway\Command\RestGetCommand">
+        <arguments>
+            <argument name="transferFactory" xsi:type="object">Payments\Core\Gateway\Http\TransferFactory</argument>
+            <argument name="builder" xsi:type="object">Payments\Core\Gateway\Request\Rest\DateIntervalBuilder</argument>
+            <argument name="client" xsi:type="object">PaymentsCoreSecureFileShareGetListClient</argument>
+            <argument name="validator" xsi:type="object">Payments\Core\Gateway\Validator\RestResponseCodeValidator</argument>
+            <argument name="exceptionMessage" xsi:type="string">Failed to load Secure File Share list. Please verify extension configuration.</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreSecureFileShareGetListClient" type="Payments\Core\Gateway\Http\Client\Rest">
+        <arguments>
+            <argument name="requestMethod" xsi:type="const">Magento\Framework\HTTP\ZendClient::GET</argument>
+            <argument name="requestPath" xsi:type="string">/sfs/v1/file-details</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreSecureFileShareGetFileCommand" type="Payments\Core\Gateway\Command\RestGetCommand">
+        <arguments>
+            <argument name="transferFactory" xsi:type="object">Payments\Core\Gateway\Http\TransferFactory</argument>
+            <argument name="builder" xsi:type="object">PaymentsCoreSecureFileShareGetFileRequestBuilder</argument>
+            <argument name="client" xsi:type="object">PaymentsCoreSecureFileShareGetFileClient</argument>
+            <argument name="validator" xsi:type="object">Payments\Core\Gateway\Validator\RestResponseCodeValidator</argument>
+            <argument name="exceptionMessage" xsi:type="string">Failed to load Secure File Share file. Please verify extension configuration.</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreSecureFileShareGetFileRequestBuilder" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="fileId" xsi:type="string">Payments\Core\Gateway\Request\Rest\SfsFileIdBuilder</item>
+                <item name="orgId" xsi:type="string">Payments\Core\Gateway\Request\Rest\OrganizationIdBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreSecureFileShareGetFileClient" type="Payments\Core\Gateway\Http\Client\Rest">
+        <arguments>
+            <argument name="requestMethod" xsi:type="const">Magento\Framework\HTTP\ZendClient::GET</argument>
+            <argument name="requestPath" xsi:type="string">/sfs/v1/files</argument>
+            <argument name="contentType" xsi:type="string">*/*</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Magento\Framework\View\Asset\Minification">
+        <plugin name="payments-core-minification-plugin" type="Payments\Core\Plugin\MinificationPlugin"/>
+    </type>
+</config>

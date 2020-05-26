@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="payment_method_assign_data">
+        <observer name="sop_payment_gateway_data_assign" instance="Payments\SecureAcceptance\Observer\DataAssignObserver"/>
+    </event>
+    <event name="sales_order_payment_capture">
+        <observer name="secure_acceptance_set_capture_item_list" instance="Payments\SecureAcceptance\Observer\PrepareCapture"/>
+    </event>
+</config>

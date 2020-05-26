@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="payment_method_assign_data">
+        <observer name="3ds_payment_gateway_data_assign" instance="Payments\ThreeDSecure\Observer\DataAssignObserver"/>
+    </event>
+
+    <event name="sales_model_service_quote_submit_failure">
+        <observer name="processor_transaction_id_observer" instance="Payments\ThreeDSecure\Observer\ProcessorTransactionIdObserver"/>
+    </event>
+
+</config>

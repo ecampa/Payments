@@ -1,0 +1,21 @@
+{
+  "name": "payments/module-applepay",
+  "description": "ApplePay module for Magento",
+  "require": {
+    "php": "7.0.2|7.0.4|~7.0.6|~7.1.0|~7.1.3|~7.2.0|~7.3.0",
+    "payments/module-core": "~3.1.0"
+  },
+  "type": "magento2-module",
+  "version": "3.1.0",
+  "license": [
+    "proprietary"
+  ],
+  "autoload": {
+    "files": [
+      "registration.php"
+    ],
+    "psr-4": {
+      "Payments\\ApplePay\\": ""
+    }
+  }
+}

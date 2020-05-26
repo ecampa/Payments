@@ -1,0 +1,246 @@
+<?php
+
+namespace Payments\SecureAcceptance\Controller\Adminhtml\Transparent;
+
+use Payments\SecureAcceptance\Gateway\Request\AbstractRequest;
+
+class Response extends \Payments\Core\Action\CsrfIgnoringAction
+{
+    /**
+     * @var \Magento\Framework\Session\SessionManagerInterface
+     */
+    private $checkoutSession;
+
+    /**
+     * @var \Magento\Quote\Model\QuoteManagement
+     */
+    private $quoteManagement;
+
+    /**
+     * @var \Magento\Framework\View\Result\LayoutFactory
+     */
+    private $resultLayoutFactory;
+
+    /**
+     * @var \Payments\SecureAcceptance\Helper\RequestDataBuilder
+     */
+    private $requestDataBuilder;
+
+    /**
+     * @var \Magento\Quote\Api\CartRepositoryInterface
+     */
+    private $quoteRepository;
+
+    /**
+     * @var \Payments\SecureAcceptance\Gateway\Config\Config
+     */
+    private $config;
+
+    /**
+     * @var \Magento\Sales\Api\OrderRepositoryInterface
+     */
+    private $orderRepository;
+
+    /**
+     * @var \Magento\Framework\Registry
+     */
+    private $coreRegistry;
+
+    /**
+     * @var \Magento\Sales\Model\AdminOrder\Create
+     */
+    private $orderCreateModel;
+
+    /**
+     * @var \Magento\GiftMessage\Model\Save
+     */
+    private $giftmessageSaveModel;
+
+    /**
+     * @var \Zend\Stdlib\ParametersFactory
+     */
+    private $parametersFactory;
+
+    /**
+     * Response constructor.
+     * @param \Magento\Framework\App\Action\Context $context
+     * @param \Magento\Framework\Session\SessionManagerInterface $sessionManager
+     * @param \Magento\Quote\Model\QuoteManagement $quoteManagement
+     * @param \Magento\Framework\View\Result\LayoutFactory $resultLayoutFactory
+     * @param \Payments\SecureAcceptance\Helper\RequestDataBuilder $requestDataBuilder
+     * @param \Magento\Quote\Api\CartRepositoryInterface $quoteRepository
+     * @param \Payments\SecureAcceptance\Gateway\Config\Config $config
+     * @param \Magento\Sales\Api\OrderRepositoryInterface $orderRepository
+     * @param \Magento\Framework\Registry $coreRegistry
+     * @param \Magento\Sales\Model\AdminOrder\Create $orderCreateModel
+     * @param \Zend\Stdlib\ParametersFactory $parametersFactory
+     * @param \Magento\GiftMessage\Model\Save $giftmessageSaveModel
+     */
+    public function __construct(
+        \Magento\Framework\App\Action\Context $context,
+        \Magento\Framework\Session\SessionManagerInterface $sessionManager,
+        \Magento\Quote\Model\QuoteManagement $quoteManagement,
+        \Magento\Framework\View\Result\LayoutFactory $resultLayoutFactory,
+        \Payments\SecureAcceptance\Helper\RequestDataBuilder $requestDataBuilder,
+        \Magento\Quote\Api\CartRepositoryInterface $quoteRepository,
+        \Payments\SecureAcceptance\Gateway\Config\Config $config,
+        \Magento\Sales\Api\OrderRepositoryInterface $orderRepository,
+        \Magento\Framework\Registry $coreRegistry,
+        \Magento\Sales\Model\AdminOrder\Create $orderCreateModel,
+        \Magento\GiftMessage\Model\Save $giftmessageSaveModel,
+        \Zend\Stdlib\ParametersFactory $parametersFactory
+    ) {
+        parent::__construct($context);
+
+        $this->checkoutSession = $sessionManager;
+        $this->quoteManagement = $quoteManagement;
+        $this->resultLayoutFactory = $resultLayoutFactory;
+        $this->requestDataBuilder = $requestDataBuilder;
+        $this->quoteRepository = $quoteRepository;
+        $this->config = $config;
+        $this->orderRepository = $orderRepository;
+        $this->coreRegistry = $coreRegistry;
+        $this->orderCreateModel = $orderCreateModel;
+        $this->parametersFactory = $parametersFactory;
+        $this->giftmessageSaveModel = $giftmessageSaveModel;
+    }
+
+    /**
+     *
+     * Main action method.
+     *
+     * Processes SOP response and saves the order.
+     *
+     * @return \Magento\Framework\App\ResponseInterface|\Magento\Framework\Controller\ResultInterface
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    public function execute()
+    {
+        /** @var array $transparentResponse */
+        $transparentResponse = $this->getRequest()->getParams();
+
+        $message = false;
+
+        try {
+            if (!$this->isValidSignature($transparentResponse)) {
+                throw new \Magento\Framework\Exception\LocalizedException(__('Payment could not be processed.'));
+            }
+
+            $this->substitutePostWithOrderData();
+
+            /** @var \Magento\Quote\Model\Quote $quote */
+            $quote = $this->orderCreateModel->getQuote();
+
+            $quote->setCustomerId($this->orderCreateModel->getSession()->getCustomerId());
+
+            $this->orderCreateModel->setPaymentMethod(\Payments\SecureAcceptance\Model\Ui\ConfigProvider::CODE);
+            $this->orderCreateModel->setPaymentData(['method' => \Payments\SecureAcceptance\Model\Ui\ConfigProvider::CODE]);
+
+            if ($giftmessages = $this->getRequest()->getPost('giftmessage')) {
+                $this->giftmessageSaveModel->setGiftmessages($giftmessages)->saveAllInQuote();
+            }
+
+            $this->orderCreateModel->recollectCart();
+            $this->orderCreateModel->saveQuote();
+
+            $this->coreRegistry->register(\Payments\SecureAcceptance\Gateway\Request\AbstractRequest::TRANSPARENT_RESPONSE_KEY, $transparentResponse);
+
+            $order = $this->orderCreateModel
+                ->setIsValidate(true)
+                ->importPostData($this->getRequest()->getPost('order'))
+                ->createOrder();
+
+            $this->messageManager->addSuccessMessage('Your order has been successfully created!');
+
+            $successUrl = $this->_url->getUrl(
+                'sales/order/view',
+                ['order_id' => $order->getId(), '_secure' => $this->getRequest()->isSecure()]
+            );
+
+            if ($this->isResponseRedirect()) {
+                return $this->resultRedirectFactory->create()->setUrl($successUrl);
+            }
+
+            $message = $this->messageManager->getMessages()->getLastAddedMessage();
+            $message->setIsSticky(true);
+
+            $parameters['order_success'] = $successUrl;
+        } catch (\Exception $e) {
+            $parameters['error'] = true;
+            $parameters['error_msg'] = $e->getMessage();
+        }
+
+        if ($this->isResponseRedirect() && isset($parameters['error_msg'])) {
+            $this->messageManager->addErrorMessage($parameters['error_msg']);
+            return $this->resultRedirectFactory->create()->setPath('sales/order_create/index');
+        }
+
+        $this->coreRegistry->register(\Magento\Payment\Block\Transparent\Iframe::REGISTRY_KEY, $parameters);
+
+        $resultLayout = $this->resultLayoutFactory->create();
+        $resultLayout->addDefaultHandle();
+        $resultLayout->getLayout()->getUpdate()->load(['payments_iframe_payment_response']);
+
+        if ($message && $message->getIsSticky()) {
+            $resultLayout->getLayout()->getBlock('dummy'); // trigger layout build to clear messages except our one
+            $message->setIsSticky(false);
+        }
+
+        return $resultLayout;
+    }
+
+    /**
+     * @return bool
+     */
+    private function isResponseRedirect()
+    {
+        return !$this->config->isSilent() && !$this->config->getUseIFrame();
+    }
+
+    private function getSopSecretKey()
+    {
+        return $this->config->getValue(
+            \Payments\SecureAcceptance\Gateway\Config\Config::KEY_SOP_SECRET_KEY,
+            $this->orderCreateModel->getQuote()->getStoreId()
+        );
+    }
+
+    private function getSecretKey()
+    {
+        return $this->config->getValue(
+            \Payments\SecureAcceptance\Gateway\Config\Config::KEY_SECRET_KEY,
+            $this->orderCreateModel->getQuote()->getStoreId()
+        );
+    }
+
+    /**
+     * Validate response signature with secret key.
+     *
+     * @param $response
+     * @return bool
+     */
+    private function isValidSignature($response)
+    {
+        $transactionKey = $this->config->isSilent() ? $this->getSopSecretKey() : $this->getSecretKey();
+
+        return $this->requestDataBuilder->validateSignature($response, $transactionKey);
+    }
+
+    /**
+     * @return $this
+     */
+    private function substitutePostWithOrderData()
+    {
+        $orderData = $this->checkoutSession->getOrderDataPost();
+
+        /** @var \Zend\Stdlib\Parameters $postParams */
+        $postParams = $this->parametersFactory->create();
+        $postParams->fromString($orderData);
+
+        $this->getRequest()->setPost($postParams);
+
+        $this->checkoutSession->unsOrderDataPost();
+
+        return $this;
+    }
+}

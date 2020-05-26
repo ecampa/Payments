@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" layout="empty" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="after.body.start">
+            <block class="Payments\ThreeDSecure\Block\SongbirdJs" name="songbird-requirejs-config" template="Payments_ThreeDSecure::songbirdjs.phtml" ifconfig="payment/payments_sa/active_3ds"/>
+            <block class="Payments\ThreeDSecure\Block\Transparent\Iframe" name="transparent_iframe" template="Payments_ThreeDSecure::transparent/iframe_redirect.phtml">
+                <block class="Payments\ThreeDSecure\Block\Transparent\Iframe" name="3ds_continue" template="Payments_ThreeDSecure::transparent/3ds_continue.js.phtml"/>
+            </block>
+        </referenceContainer>
+    </body>
+</page>

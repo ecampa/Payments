@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <!-- Payment Method Facade configuration -->
+    <virtualType name="PaymentsECheckPaymentGatewayFacade" type="Magento\Payment\Model\Method\Adapter">
+        <arguments>
+            <argument name="code" xsi:type="const">Payments\ECheck\Model\Ui\ConfigProvider::CODE</argument>
+            <argument name="formBlockType" xsi:type="string">Magento\Payment\Block\Form</argument>
+            <argument name="infoBlockType" xsi:type="string">Magento\Payment\Block\Info</argument>
+            <argument name="valueHandlerPool" xsi:type="object">PaymentsECheckPaymentGatewayValueHandlerPool</argument>
+            <argument name="commandPool" xsi:type="object">PaymentsECheckPaymentGatewayCommandPool</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Configuration reader -->
+    <type name="Payments\ECheck\Gateway\Config\Config">
+        <arguments>
+            <argument name="pathPattern" xsi:type="const">Magento\Payment\Gateway\Config\Config::DEFAULT_PATH_PATTERN</argument>
+            <argument name="methodCode" xsi:type="const">Payments\ECheck\Model\Ui\ConfigProvider::CODE</argument>
+        </arguments>
+    </type>
+
+    <!-- Commands infrastructure -->
+    <virtualType name="PaymentsECheckPaymentGatewayCommandPool" type="Magento\Payment\Gateway\Command\CommandPool">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="capture" xsi:type="string">PaymentsECheckPaymentGatewayCaptureCommand</item>
+                <item name="void" xsi:type="string">PaymentsECheckPaymentGatewayVoidCommand</item>
+                <item name="cancel" xsi:type="string">PaymentsECheckPaymentGatewayVoidCommand</item>
+                <item name="refund" xsi:type="string">PaymentsECheckPaymentGatewayVoidCommand</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Capture command -->
+    <virtualType name="PaymentsECheckPaymentGatewayCaptureCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\ECheck\Gateway\Request\CaptureRequest</argument>
+            <argument name="handler" xsi:type="object">Payments\ECheck\Gateway\Response\ReasonCodeHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\ECheck\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\ECheck\Gateway\Validator\ResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\ECheck\Gateway\Http\Client\Client</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Capture Request -->
+    <type name="Payments\ECheck\Gateway\Request\CaptureRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\ECheck\Gateway\Config\Config</argument>
+        </arguments>
+    </type>
+
+    <!-- Void command -->
+    <virtualType name="PaymentsECheckPaymentGatewayVoidCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\ECheck\Gateway\Request\VoidRequest</argument>
+            <argument name="handler" xsi:type="object">Payments\ECheck\Gateway\Response\VoidResponseHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\ECheck\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\ECheck\Gateway\Validator\ResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\ECheck\Gateway\Http\Client\Client</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Void Request -->
+    <type name="Payments\ECheck\Gateway\Request\VoidRequest">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\ECheck\Gateway\Config\Config</argument>
+        </arguments>
+    </type>
+
+    <!-- Response handlers -->
+    <virtualType name="PaymentsECheckPaymentGatewayResponseHandlerComposite" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="reasoncode" xsi:type="string">Payments\ECheck\Gateway\Response\ReasonCodeHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Value handlers infrastructure -->
+    <virtualType name="PaymentsECheckPaymentGatewayValueHandlerPool" type="Magento\Payment\Gateway\Config\ValueHandlerPool">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="default" xsi:type="string">PaymentsECheckPaymentGatewayConfigValueHandler</item>
+                <item name="can_void" xsi:type="string">Payments\ECheck\Gateway\Config\CanVoidHandler</item>
+                <item name="can_cancel" xsi:type="string">Payments\ECheck\Gateway\Config\CanVoidHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsECheckPaymentGatewayConfigValueHandler" type="Magento\Payment\Gateway\Config\ConfigValueHandler">
+        <arguments>
+            <argument name="configInterface" xsi:type="object">Payments\ECheck\Gateway\Config\Config</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\ECheck\Cron\Status">
+        <arguments>
+            <argument name="command" xsi:type="object">Payments\ECheck\Gateway\Command\GetNotificationOfChangesReportCommand</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\ECheck\Gateway\Command\GetNotificationOfChangesReportCommand">
+        <arguments>
+            <argument name="transferFactory" xsi:type="object">Payments\Core\Gateway\Http\TransferFactory</argument>
+            <argument name="builder" xsi:type="object">Payments\Core\Gateway\Request\Rest\DateIntervalBuilder</argument>
+            <argument name="client" xsi:type="object">PaymentsCoreNotificationOfChangesClient</argument>
+            <argument name="validator" xsi:type="object">Payments\Core\Gateway\Validator\ConversionDetailsValidator</argument>
+            <argument name="mapper" xsi:type="object">Payments\Core\Gateway\Response\ConversionDetailsMapper</argument>
+        </arguments>
+    </type>
+
+    <virtualType name="PaymentsCoreNotificationOfChangesClient" type="Payments\Core\Gateway\Http\Client\Rest">
+        <arguments>
+            <argument name="requestMethod" xsi:type="const">Magento\Framework\HTTP\ZendClient::GET</argument>
+            <argument name="requestPath" xsi:type="string">/reporting/v3/notification-of-changes</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Logger, initialized with ModuleConfig -->
+    <virtualType name="PaymentLogger" type="Magento\Payment\Model\Method\Logger">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\Core\Model\Config</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\ECheck\Gateway\Request\AbstractRequest">
+        <arguments>
+            <argument name="paymentLogger" xsi:type="object">PaymentLogger</argument>
+        </arguments>
+    </type>
+
+</config>

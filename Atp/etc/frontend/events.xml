@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
+    <event name="payments_atp_login_reject">
+        <observer name="atp_internal_login_reject_observer" instance="Payments\Atp\Observer\LoginRejectedObserver"/>
+    </event>
+    <event name="payments_atp_account_update_reject">
+        <observer name="atp_internal_account_update_reject_observer" instance="Payments\Atp\Observer\UpdateRejectedObserver"/>
+    </event>
+    <event name="payments_atp_account_creation_reject">
+        <observer name="atp_internal_account_creation_reject_observer" instance="Payments\Atp\Observer\UpdateRejectedObserver"/>
+    </event>
+</config>

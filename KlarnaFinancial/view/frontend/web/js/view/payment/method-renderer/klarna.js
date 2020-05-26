@@ -1,0 +1,207 @@
+define(
+    [
+        'jquery',
+        'ko',
+        'Magento_Checkout/js/view/payment/default',
+        'klarnaJsSDK',
+        'Magento_Checkout/js/model/payment/additional-validators',
+        'Magento_Checkout/js/model/quote',
+        'Magento_Customer/js/customer-data',
+        'Magento_Checkout/js/action/set-billing-address',
+        'Magento_Checkout/js/action/set-shipping-information',
+        'Magento_Checkout/js/model/full-screen-loader',
+        'mage/url',
+        'jquery/ui',
+        'mage/translate'
+    ],
+    function (
+        $,
+        ko,
+        Component,
+        klarnaJsSDK,
+        additionalValidators,
+        quote,
+        customerData,
+        setBillingAddress,
+        setShippingInformation,
+        fullScreenLoader,
+        urlBuilder
+    ) {
+        'use strict';
+
+        return Component.extend({
+            defaults: {
+                active: false,
+                template: 'Payments_KlarnaFinancial/payment/form',
+                code: 'payments_klarna',
+                grandTotalAmount: null,
+                currencyCode: null,
+                initErrorMessage: ko.observable(null),
+                count: 0,
+                imports: {
+                    onActiveChange: 'active'
+                }
+            },
+
+            initObservable: function () {
+                var self = this;
+                this._super()
+                    .observe(['active']);
+                this.grandTotalAmount = quote.totals()['base_grand_total'];
+                this.currencyCode = quote.totals()['base_currency_code'];
+
+                quote.totals.subscribe(function () {
+                    if (self.grandTotalAmount !== quote.totals()['base_grand_total']) {
+                        self.grandTotalAmount = quote.totals()['base_grand_total'];
+                    }
+
+                    if (self.currencyCode !== quote.totals()['base_currency_code']) {
+                        self.currencyCode = quote.totals()['base_currency_code'];
+                    }
+                });
+
+                quote.totals.subscribe(this.updateSession.bind(this));
+
+               
+               
+               
+
+                return this;
+            },
+            updateSession: function (value) {
+                return $.ajax({
+                    method: 'POST',
+                    url: urlBuilder.build("paymentsklarna/index/session"),
+                    data: {
+                        'form_key': $.cookie('form_key'),
+                        'guestEmail': quote.guestEmail,
+                        'updateToken': true
+                    }
+                })
+            },
+            onActiveChange: function (isActive) {
+                if (!isActive) {
+                    return;
+                }
+
+                fullScreenLoader.startLoader();
+                this.initKlarna();
+            },
+            getCode: function () {
+                return this.code;
+            },
+
+            isActive: function () {
+                var active = this.getCode() === this.isChecked();
+
+                this.active(active);
+
+                return active;
+            },
+
+            getTitle: function () {
+                return window.checkoutConfig.payment[this.getCode()].title;
+            },
+
+            getData: function () {
+                return {
+                    'method': this.item.method
+                };
+            },
+
+            isDeveloperMode: function () {
+                return window.checkoutConfig.payment[this.getCode()].isDeveloperMode;
+            },
+            getPlaceOrderUrl: function () {
+                return window.checkoutConfig.payment[this.getCode()].placeOrderUrl;
+            },
+            placeOrder: function () {
+                var that = this;
+
+                if (!this.validate() || !additionalValidators.validate()) {
+                    return;
+                }
+
+                this.isPlaceOrderActionAllowed(false);
+                fullScreenLoader.startLoader();
+
+                setBillingAddress().then(this.updateSession).then(function () {
+                    Klarna.Credit.authorize(
+                        {},
+                        function (response) {
+                            if (response.approved !== true) {
+                                that.isPlaceOrderActionAllowed(true);
+                                fullScreenLoader.stopLoader();
+                                return;
+                            }
+
+                            var form = $(document.createElement('form'));
+                            $(form).attr("action", that.getPlaceOrderUrl());
+                            $(form).attr("method", "POST");
+                            $(form).append($('<input/>').attr('name', 'authorizationToken').attr('value', response.authorization_token));
+                            $(form).append($('<input/>').attr('name', 'quoteId').attr('value', quote.getQuoteId()));
+                            $(form).append($('<input/>').attr('name', 'guestEmail').attr('value', quote.guestEmail));
+                            $(form).append($('<input/>').attr('name', 'form_key').attr('value', $.cookie('form_key')));
+                            $(form).append('<input name="agreementId" value="' + $("#payments_klarna").parent().parent().children('.payment-method-content').children(".checkout-agreements-block").children().children().children().children().val() + '"/>');
+                            $("body").append(form);
+                            $(form).submit();
+                        }
+                    );
+                });
+            },
+
+            initKlarna: function () {
+                var self = this;
+                $.ajax({
+                    method: 'GET',
+                    url: urlBuilder.build("paymentsklarna/index/session"),
+                    data: {
+                        'guestEmail': quote.guestEmail
+                    }
+                }).done(function (data){
+                    var processorToken = data.processorToken;
+
+                    if (processorToken === "" || processorToken === null) {
+                        self.showInitErrorMessage({message: $.mage.__('Klarna widget loading error. Please try again.')});
+                        self.isPlaceOrderActionAllowed(false);
+                        fullScreenLoader.stopLoader();
+                        return false;
+                    }
+                    if (typeof data.message !== "undefined") {
+                        self.showInitErrorMessage({message: data.message});
+                        self.isPlaceOrderActionAllowed(false);
+                        fullScreenLoader.stopLoader();
+                        return false;
+                    }
+
+                    try {
+
+                        Klarna.Credit.init({client_token: processorToken});
+
+                        Klarna.Credit.load(
+                            {
+                                container: "#klarna_container"
+                            },
+                            function (res) {
+                                fullScreenLoader.stopLoader();
+                                if (res['show_form']) {
+                                    $('#klarna_container').show();
+                                    self.isPlaceOrderActionAllowed(true);
+                                    return;
+                                }
+                                self.showInitErrorMessage({message: $.mage.__('Klarna is not available as a payment option.')});
+                                self.isPlaceOrderActionAllowed(false);
+                            }
+                        );
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                });
+            },
+            showInitErrorMessage: function(messageObj) {
+                this.initErrorMessage(messageObj.message);
+            }
+        });
+    }
+);

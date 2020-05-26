@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <payment>
+            <payments_bank_transfer>
+                <active>0</active>
+                <title>Bank Transfer</title>
+                <model>Payments\BankTransfer\Model\Payment</model>
+                <ideal_currency>EUR</ideal_currency>
+                <sofort_currency>EUR</sofort_currency>
+                <bancontact_currency>EUR</bancontact_currency>
+                <eps_currency>EUR</eps_currency>
+                <giro_currency>EUR</giro_currency>
+                <ideal_title>iDEAL Bank Transfer</ideal_title>
+                <sofort_title>Sofort Bank Transfer</sofort_title>
+                <bancontact_title>Bancontact Bank Transfer</bancontact_title>
+                <eps_title>EPS Bank Transfer</eps_title>
+                <giro_title>giropay Bank Transfer</giro_title>
+                <ideal_transaction_key backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
+                <sofort_transaction_key backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
+                <bancontact_transaction_key backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
+                <eps_transaction_key backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
+                <giro_transaction_key backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
+            </payments_bank_transfer>
+            <payments_bank_transfer_ideal>
+                <active>0</active>
+                <title>iDEAL Bank Transfer</title>
+                <model>Payments\BankTransfer\Model\Payment\Ideal</model>
+                <sort_order>20</sort_order>
+                <allowspecific>1</allowspecific>
+                <specificcountry>NL</specificcountry>
+                <can_capture_partial>0</can_capture_partial>
+            </payments_bank_transfer_ideal>
+            <payments_bank_transfer_sofort>
+                <active>0</active>
+                <title>Sofort Bank Transfer</title>
+                <model>Payments\BankTransfer\Model\Payment\Sofort</model>
+                <sort_order>21</sort_order>
+                <allowspecific>1</allowspecific>
+                <specificcountry>AT,BE,DE,ES,IT,NL</specificcountry>
+                <can_capture_partial>0</can_capture_partial>
+            </payments_bank_transfer_sofort>
+            <payments_bank_transfer_bancontact>
+                <active>0</active>
+                <title>Bancontact Bank Transfer</title>
+                <model>Payments\BankTransfer\Model\Payment\Bancontact</model>
+                <sort_order>22</sort_order>
+                <allowspecific>1</allowspecific>
+                <specificcountry>BE</specificcountry>
+                <can_capture_partial>0</can_capture_partial>
+            </payments_bank_transfer_bancontact>
+            <payments_bank_transfer_eps>
+                <active>0</active>
+                <title>EPS Bank Transfer</title>
+                <model>Payments\BankTransfer\Model\Payment\Eps</model>
+                <sort_order>22</sort_order>
+                <allowspecific>1</allowspecific>
+                <specificcountry>AT</specificcountry>
+                <can_capture_partial>0</can_capture_partial>
+            </payments_bank_transfer_eps>
+            <payments_bank_transfer_giro>
+                <active>0</active>
+                <title>giropay Bank Transfer</title>
+                <model>Payments\BankTransfer\Model\Payment\Giro</model>
+                <sort_order>22</sort_order>
+                <allowspecific>1</allowspecific>
+                <specificcountry>DE</specificcountry>
+                <can_capture_partial>0</can_capture_partial>
+            </payments_bank_transfer_giro>
+        </payment>
+    </default>
+</config>

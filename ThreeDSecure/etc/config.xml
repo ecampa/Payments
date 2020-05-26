@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <payment>
+            <payments_sa>
+                <active_3ds>0</active_3ds>
+                <api_key_3ds backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
+                <card_types_3ds>VI,MC,AE,DI,JCB,OT,DN,MI</card_types_3ds>
+            </payments_sa>
+        </payment>
+    </default>
+</config>

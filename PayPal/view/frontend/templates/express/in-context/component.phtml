@@ -1,0 +1,32 @@
+<?php
+use Payments\PayPal\Block\Express\InContext\Minicart\Button;
+
+/** @var \Payments\PayPal\Block\Express\InContext\Component $block */
+$configuration = [
+    '*' => [
+        'Payments_PayPal/js/in-context/express-checkout' => [
+            'id' => \Payments\PayPal\Block\Express\InContext\Minicart\Button::PAYPAL_BUTTON_ID,
+            'path' => $block->getUrl(
+                'paymentspaypal/express/gettoken',
+                [
+                    '_secure' => $block->getRequest()->isSecure()
+                ]
+            ),
+            'merchantId' => $block->getMerchantId(),
+            'button' => $block->isButtonContext(),
+            'clientConfig' => [
+                'locale' => $block->getLocale(),
+                'environment' => $block->getEnvironment(),
+                'button' => [
+                    \Payments\PayPal\Block\Express\InContext\Minicart\Button::PAYPAL_BUTTON_ID,
+                ],
+            ]
+        ]
+    ]
+];
+
+?>
+<div style="display: none;" id="<?php echo /* @noEscape */ \Payments\PayPal\Block\Express\InContext\Minicart\Button::PAYPAL_BUTTON_ID ?>"></div>
+<script type="text/x-magento-init">
+    <?php echo /* @noEscape */ json_encode($configuration) ?>
+</script>

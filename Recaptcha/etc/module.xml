@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+    <module name="Payments_Recaptcha" setup_version="3.1.0">
+        <sequence>
+            <module name="Payments_Core"/>
+            <module name="MSP_ReCaptcha"/>
+        </sequence>
+    </module>
+</config>

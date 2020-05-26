@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <type name="Payments\SecureAcceptance\Block\Info">
+        <arguments>
+            <argument name="data" xsi:type="array">
+                <item xsi:type="string" name="is_secure_mode">0</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <type name="Magento\Vault\Model\Ui\Adminhtml\TokensConfigProvider">
+        <arguments>
+            <argument name="tokenUiComponentProviders" xsi:type="array">
+                <item name="payments_sa" xsi:type="object">Payments\SecureAcceptance\Model\Ui\Adminhtml\TokenUiComponentProvider</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Gateway\Request\VaultAuthorizationRequest">
+        <arguments>
+            <argument name="isAdmin" xsi:type="boolean">true</argument>
+        </arguments>
+    </type>
+
+    <virtualType name="PaymentsSAGatewayFacade" type="Magento\Payment\Model\Method\Adapter">
+        <arguments>
+            <argument name="formBlockType" xsi:type="string">Payments\SecureAcceptance\Block\Adminhtml\Transparent\Form</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\SecureAcceptance\Controller\Adminhtml\Transparent\RequestSilentData">
+        <arguments>
+            <argument name="sessionManager" xsi:type="object">Magento\Backend\Model\Session\Quote</argument>
+            <argument name="paymentMethod" xsi:type="object">PaymentsSAGatewayFacade</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Controller\Adminhtml\Transparent\Response">
+        <arguments>
+            <argument name="sessionManager" xsi:type="object">Magento\Backend\Model\Session\Quote</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Gateway\Config\PlaceOrderUrlHandler">
+        <arguments>
+            <argument name="isAdmin" xsi:type="boolean">true</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Helper\RequestDataBuilder">
+        <arguments>
+            <argument name="checkoutSession" xsi:type="object">Magento\Backend\Model\Session\Quote</argument>
+        </arguments>
+        <plugin name="ch-adminhtml-transparent-custom-url" type="Payments\SecureAcceptance\Plugin\Helper\RequestDataBuilderPlugin"/>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Plugin\Helper\RequestDataBuilderPlugin">
+        <arguments>
+            <argument name="checkoutSession" xsi:type="object">Magento\Backend\Model\Session\Quote</argument>
+        </arguments>
+    </type>
+
+    <type name="Magento\Vault\Model\Method\Vault">
+        <plugin name="vault_method_plugin" type="Payments\SecureAcceptance\Plugin\Model\Method\VaultPlugin"/>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Observer\DataAssignObserver">
+        <arguments>
+            <argument name="session" xsi:type="object">Magento\Backend\Model\Session\Quote</argument>
+        </arguments>
+    </type>
+
+    <virtualType name="PaymentsSAGatewaySoapVaultAuthorizeCommand" type="PaymentsSAGatewaySoapAuthorizeCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsSAGatewaySoapVaultAuthorizeRequestBuilder</argument>
+            <argument name="handler" xsi:type="object">PaymentsSAGatewaySoapVaultAuthorizationHandler</argument>
+            <argument name="validator" xsi:type="object">PaymentsSAGatewayAuthorizeValidator</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewaySoapVaultAuthorizeRequestBuilder" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="merchantData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\MerchantDataBuilder</item>
+                <item name="paymentData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\PaymentDataBuilder</item>
+                <item name="addressData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\AddressDataBuilder</item>
+                <item name="itemsData" xsi:type="string">PaymentsSAGatewayAuthorizeItemsDataBuilder</item>
+                <item name="ccAuthService" xsi:type="string">PaymentsSAGatewayCcAuthServiceRequest</item>
+                <item name="mddBuilder" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\DecisionManagerMddBuilder</item>
+                <item name="subscriptionData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\SubscriptionBuilder</item>
+                <item name="mitData" xsi:type="string">Payments\SecureAcceptance\Gateway\Request\Soap\MitDataBuilder</item>
+                <item name="cvnBuilder" xsi:type="string">PaymentsSAGatewayCvnBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsSAGatewayCvnBuilder" type="Payments\SecureAcceptance\Gateway\Request\Soap\CvnBuilder">
+        <arguments>
+            <argument name="isAdmin" xsi:type="string">true</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\SecureAcceptance\Gateway\Config\Config">
+        <arguments>
+            <argument name="isAdmin" xsi:type="boolean">true</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Gateway\Validator\Flex\MicroformResponseValidator">
+        <arguments>
+            <argument name="isAdminHtml" xsi:type="boolean">true</argument>
+        </arguments>
+    </type>
+
+    <virtualType name="PaymentsSAGatewaySoapVaultAuthorizationHandler" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="transactionDetails" xsi:type="string">PaymentsSASoapAuthorizeTransactionDetailsHandler</item>
+                <item name="additionalInfo" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\Soap\AdditionalInfoHandler</item>
+                <item name="dmDetails" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\Soap\DecisionManagerHandler</item>
+                <item name="mitHandler" xsi:type="string">Payments\SecureAcceptance\Gateway\Response\Soap\MitDetailsHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+</config>

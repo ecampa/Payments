@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <section id="payment">
+            <group id="payments_section" translate="label" type="text" sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
+                <group id="payments_general">
+                    <field id="order_status" translate="label" type="select" sortOrder="25" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                        <label>New Order Status</label>
+                        <source_model>Magento\Sales\Model\Config\Source\Order\Status\Processing</source_model>
+                        <config_path>payment/payments_sa/order_status</config_path>
+                    </field>
+                    <field id="ignore_avs" translate="label" type="select" sortOrder="143" showInDefault="1" showInWebsite="0" showInStore="1">
+                        <label>Ignore AVS</label>
+                        <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                        <config_path>payment/payments_sa/ignore_avs</config_path>
+                    </field>
+                    <field id="ignore_cvn" translate="label" type="select" sortOrder="146" showInDefault="1" showInWebsite="0" showInStore="1">
+                        <label>Ignore CVN</label>
+                        <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                        <config_path>payment/payments_sa/ignore_cvn</config_path>
+                    </field>
+                    <field id="sa_mode" translate="label" type="select" sortOrder="143" showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Authorize via Secure Acceptance</label>
+                        <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                        <config_path>payment/payments_sa/sa_mode</config_path>
+                        <comment>'No' - the card information is tokenized via Gateway, authorization is requested separately via SOAP service (Recommended). 'Yes' - an authorization is performed at the moment of posting card data to Gateway (Compatible with 3.0.x extension)</comment>
+                    </field>
+                    <field id="token_skip_decision_manager" translate="label" type="select" sortOrder="144" showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Skip Decision Manager for tokenization</label>
+                        <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                        <config_path>payment/payments_sa/token_skip_decision_manager</config_path>
+                        <depends>
+                            <field id="sa_mode">0</field>
+                        </depends>
+                    </field>
+                    <field id="token_skip_auto_auth" translate="label" type="select" sortOrder="144" showInDefault="1" showInWebsite="1" showInStore="1" canRestore="1">
+                        <label>Skip Auto Auth for tokenization</label>
+                        <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                        <config_path>payment/payments_sa/token_skip_auto_auth</config_path>
+                        <depends>
+                            <field id="sa_mode">0</field>
+                        </depends>
+                        <comment>Disabling this option is highly risky! Use the ReCaptcha module to protect your store from mass card testing attacks with SOP!</comment>
+                    </field>
+                </group>
+                <group id="payments_sop" translate="label" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Secure Acceptance Silent Order Post (SOP)</label>
+                    <field id="sop_profile_id" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
+                        <label>Profile Id</label>
+                        <config_path>payment/payments_sa/sop_profile_id</config_path>
+                    </field>
+                    <field id="sop_access_key" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
+                        <label>Access Key</label>
+                        <config_path>payment/payments_sa/sop_access_key</config_path>
+                    </field>
+                    <field id="sop_secret_key" translate="label" type="obscure" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
+                        <label>Secret Key</label>
+                        <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                        <config_path>payment/payments_sa/sop_secret_key</config_path>
+                    </field>
+                    <group id="payments_sop_pa_profile" translate="label" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
+                        <label>Payer Authentication Profile</label>
+                        <comment>Use another Secure Acceptance Profile for Payer Authentication payments</comment>
+                        <field id="sop_auth_active" translate="label" type="select" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
+                            <label>Enabled</label>
+                            <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                            <config_path>payment/payments_sa/sop_auth_active</config_path>
+                        </field>
+                        <field id="sop_auth_profile_id" translate="label" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
+                            <label>Profile Id</label>
+                            <config_path>payment/payments_sa/sop_auth_profile_id</config_path>
+                            <depends>
+                                <field id="sop_auth_active">1</field>
+                            </depends>
+                        </field>
+                        <field id="sop_auth_access_key" translate="label" type="text" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
+                            <label>Access Key</label>
+                            <config_path>payment/payments_sa/sop_auth_access_key</config_path>
+                            <depends>
+                                <field id="sop_auth_active">1</field>
+                            </depends>
+                        </field>
+                        <field id="sop_auth_secret_key" translate="label" type="obscure" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
+                            <label>Secret Key</label>
+                            <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                            <config_path>payment/payments_sa/sop_auth_secret_key</config_path>
+                            <depends>
+                                <field id="sop_auth_active">1</field>
+                            </depends>
+                        </field>
+                    </group>
+                </group>
+                <group id="payments_vault" translate="label" type="text" sortOrder="51" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Token Management Service</label>
+                    <field id="payments_sa_cc_vault_active" translate="label" type="select" sortOrder="12" showInDefault="1" showInWebsite="1" showInStore="0">
+                        <label>Tokenization Enabled</label>
+                        <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                        <config_path>payment/payments_sa_cc_vault/active</config_path>
+                        <requires>
+                            <group id="payments_sop"/>
+                        </requires>
+                    </field>
+                    <field id="enable_admin_vault" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Tokenization Enabled for Admin orders</label>
+                        <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                        <config_path>payment/payments_sa_cc_vault/active_admin</config_path>
+                        <depends>
+                            <field id="payments_sa_cc_vault_active">1</field>
+                        </depends>
+                        <comment>Enables storing card details for orders placed in the admin area</comment>
+                    </field>
+                    <field id="payments_sa_cc_vault_title" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Tokenization Title</label>
+                        <config_path>payment/payments_sa_cc_vault/title</config_path>
+                        <requires>
+                            <group id="payments_sop"/>
+                        </requires>
+                    </field>
+                    <field id="enable_cvv" translate="label" type="select" sortOrder="180" showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Use CVV for Saved Credit Cards</label>
+                        <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                        <config_path>payment/payments_sa/enable_cvv</config_path>
+                    </field>
+                    <field id="enable_admin_cvv" translate="label" type="select" sortOrder="185" showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Use CVV for Saved Credit Cards in Admin</label>
+                        <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                        <config_path>payment/payments_sa_cc_vault/enable_admin_cvv</config_path>
+                    </field>
+                </group>
+                <group id="payments" translate="label" type="text" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
+                    <label>Secure Acceptance Web/Mobile</label>
+                    <field id="profile_id" translate="label" type="text" sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="0">
+                        <label>Profile Id</label>
+                        <config_path>payment/payments_sa/profile_id</config_path>
+                    </field>
+                    <field id="access_key" translate="label" type="text" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="0">
+                        <label>Access Key</label>
+                        <config_path>payment/payments_sa/access_key</config_path>
+                    </field>
+                    <field id="secret_key" translate="label" type="obscure" sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="0">
+                        <label>Secret Key</label>
+                        <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                        <config_path>payment/payments_sa/secret_key</config_path>
+                    </field>
+                    <field id="use_iframe" translate="label" type="select" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0">
+                        <label>Use Iframe</label>
+                        <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                        <config_path>payment/payments_sa/use_iframe</config_path>
+                    </field>
+                    <field id="use_iframe_sandbox" translate="label" type="select" sortOrder="50" showInDefault="1" showInWebsite="1" showInStore="0">
+                        <label>Enable Iframe "sandbox" Attribute</label>
+                        <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                        <config_path>payment/payments_sa/use_iframe_sandbox</config_path>
+                        <depends><field id="use_iframe">1</field></depends>
+                        <comment>Disable this if payer authentication is enabled for current Secure Acceptance Web/Mobile profile</comment>
+                    </field>
+                    <group id="payments_pa_profile" translate="label" type="text" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
+                        <label>Payer Authentication Profile</label>
+                        <comment>Use another Secure Acceptance Profile for Payer Authentication payments</comment>
+                        <field id="auth_active" translate="label" type="select" sortOrder="60" showInDefault="1" showInWebsite="1" showInStore="0">
+                            <label>Enabled</label>
+                            <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                            <config_path>payment/payments_sa/auth_active</config_path>
+                        </field>
+                        <field id="auth_profile_id" translate="label" type="text" sortOrder="70" showInDefault="1" showInWebsite="1" showInStore="0">
+                            <label>Profile Id</label>
+                            <config_path>payment/payments_sa/auth_profile_id</config_path>
+                            <depends>
+                                <field id="auth_active">1</field>
+                            </depends>
+                        </field>
+                        <field id="auth_access_key" translate="label" type="text" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="0">
+                            <label>Access Key</label>
+                            <config_path>payment/payments_sa/auth_access_key</config_path>
+                            <depends>
+                                <field id="auth_active">1</field>
+                            </depends>
+                        </field>
+                        <field id="auth_secret_key" translate="label" type="obscure" sortOrder="90" showInDefault="1" showInWebsite="1" showInStore="0">
+                            <label>Secret Key</label>
+                            <backend_model>Magento\Config\Model\Config\Backend\Encrypted</backend_model>
+                            <config_path>payment/payments_sa/auth_secret_key</config_path>
+                            <depends>
+                                <field id="auth_active">1</field>
+                            </depends>
+                        </field>
+                    </group>
+                </group>
+            </group>
+        </section>
+    </system>
+</config>
