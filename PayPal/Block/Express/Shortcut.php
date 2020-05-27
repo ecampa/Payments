@@ -14,22 +14,6 @@ class Shortcut extends \Magento\Paypal\Block\Express\Shortcut
 {
     private $gatewayConfig;
 
-    /**
-     * Shortcut constructor.
-     * @param \Magento\Framework\View\Element\Template\Context $context
-     * @param \Magento\Paypal\Model\ConfigFactory $paypalConfigFactory
-     * @param \Magento\Paypal\Model\Express\Checkout\Factory $checkoutFactory
-     * @param \Magento\Framework\Math\Random $mathRandom
-     * @param \Magento\Framework\Locale\ResolverInterface $localeResolver
-     * @param ValidatorInterface $shortcutValidator
-     * @param string $paymentMethodCode
-     * @param string $startAction
-     * @param string $checkoutType
-     * @param string $alias
-     * @param string $shortcutTemplate
-     * @param \Magento\Checkout\Model\Session|null $checkoutSession
-     * @param array $data
-     */
     public function __construct(
         \Magento\Framework\View\Element\Template\Context $context,
         \Magento\Paypal\Model\ConfigFactory $paypalConfigFactory,
