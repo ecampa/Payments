@@ -13,6 +13,7 @@ class Config extends \Payments\Core\Model\AbstractGatewayConfig
     const CODE = 'payments_klarna';
 
     const KEY_ACTIVE = "active";
+    const KEY_USE_DEFAULT_MID = "use_default_mid";
     const KEY_TITLE = "title";
     const KEY_TEST = "test_mode";
     const KEY_PAYMENT_ACTION = "payment_action";
@@ -36,6 +37,7 @@ class Config extends \Payments\Core\Model\AbstractGatewayConfig
         ScopeConfigInterface $scopeConfig,
         $methodCode,
         $pathPattern
+       
     ) {
         $this->methodCode = $methodCode;
         $this->scopeConfig = $scopeConfig;
@@ -51,6 +53,10 @@ class Config extends \Payments\Core\Model\AbstractGatewayConfig
     public function getTitle()
     {
         return $this->getValue(self::KEY_TITLE);
+    }
+    public function isDefaultMid()
+    {
+        return $this->getValue(self::KEY_USE_DEFAULT_MID);
     }
 
     public function isTest()
@@ -89,4 +95,51 @@ class Config extends \Payments\Core\Model\AbstractGatewayConfig
     {
         return ($this->isTest() == 1) ? "true" : "false";
     }
+	
+	/*
+	
+	* get module merchant id
+	
+	* @param $storeId
+	* @return merchantId|NULL
+	*/
+	public function getMerchantId($storeId = null)
+    {
+		return $this->getModuleValue(self::KEY_MERCHANT_ID, $storeId);
+    }
+	
+	
+	/*
+	
+	* get module transaction key
+	
+	* @param $storeId
+	* @return transactionKey|NULL
+	*/
+	public function getTransactionKey($storeId = null)
+    {
+		return $this->getModuleValue(self::KEY_TRANSACTION_KEY, $storeId);
+    }
+	
+	/**
+  * return module specific credentials
+  * @param string $field
+  * @param $storeId
+  * @return string $value
+  */
+ public function getModuleValue($field, $storeId = null)
+    {
+        $value = null;
+        $isDefaultMid = $this->isDefaultMid();
+        if(!$isDefaultMid){
+            $value = $this->scopeConfig->getValue(
+            sprintf($this->pathPattern, $this->methodCode, $field),
+            ScopeInterface::SCOPE_STORE,
+            $storeId
+            );
+        }
+    
+        return $value;
+    }
+	
 }

@@ -1,0 +1,19 @@
+<?php
+?>
+<?php
+$labelPosition = '';
+if ($block->isOrPositionBefore()) {
+    $labelPosition = ' before';
+} elseif ($block->isOrPositionAfter()) {
+    $labelPosition = ' after';
+}
+$shortcutHtmlId = $block->escapeHtml($block->getShortcutHtmlId());
+?>
+<div
+        data-label="<?php echo $block->escapeHtml(__('or')) ?>"
+        class="checkout googlepay-button-container <?php echo $labelPosition ?>"
+        data-mage-init='{"Payments_GooglePay/js/view/payment/shortcut": <?php echo $block->getJsonConfig() ?>}'
+        <?php echo $block->getIsInCatalogProduct() ? '' : 'style="text-align: center; margin-top: 15px;"' ?>
+>
+    <div id="<?php echo $shortcutHtmlId ?>"></div>
+</div>

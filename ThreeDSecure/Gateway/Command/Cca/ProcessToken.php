@@ -74,7 +74,7 @@ class ProcessToken implements \Magento\Payment\Gateway\CommandInterface
         }
 
         $this->logger->debug('Received JWT: ' . $ccaResponse);
-        $this->logger->debug('JWT Payload:' . var_export((array)$parsedToken->getClaim('Payload'), true));
+        $this->logger->debug('JWT Payload:' . var_export((array)$parsedToken->claims()->get('Payload'), true));
 
         return $this->arrayResultFactory->create([
                 'array' => [

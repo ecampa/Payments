@@ -54,8 +54,15 @@
     <type name="Payments\ApplePay\Gateway\Request\AuthorizeRequest">
         <arguments>
             <argument name="config" xsi:type="object">Payments\ApplePay\Gateway\Config\Config</argument>
+            <argument name="requestDataBuilder" xsi:type="object">PaymentsApplePayHelperRequestDataBuilder</argument>
         </arguments>
     </type>
+
+    <virtualType name="PaymentsApplePayHelperAuthorizeRequestDataBuilder" type="Payments\ApplePay\Helper\RequestDataBuilder">
+        <arguments>
+            <argument name="orderItemsBuilder" xsi:type="object">PaymentsCoreGatewaySoapAuthorizeItemsDataBuilder</argument>
+        </arguments>
+    </virtualType>
 
     <!-- Capture command -->
     <virtualType name="PaymentsApplePayPaymentGatewayCaptureCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
@@ -73,8 +80,15 @@
     <type name="Payments\ApplePay\Gateway\Request\CaptureRequest">
         <arguments>
             <argument name="config" xsi:type="object">Payments\ApplePay\Gateway\Config\Config</argument>
+            <argument name="requestDataBuilder" xsi:type="object">PaymentsApplePayHelperCaptureRequestDataBuilder</argument>
         </arguments>
     </type>
+
+    <virtualType name="PaymentsApplePayHelperCaptureRequestDataBuilder" type="Payments\ApplePay\Helper\RequestDataBuilder">
+        <arguments>
+            <argument name="orderItemsBuilder" xsi:type="object">PaymentsCoreGatewaySoapCaptureItemsDataBuilder</argument>
+        </arguments>
+    </virtualType>
 
     <!-- Sale command -->
     <virtualType name="PaymentsApplePaySaleCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
@@ -137,9 +151,16 @@
     <type name="Payments\ApplePay\Gateway\Request\RefundRequest">
         <arguments>
             <argument name="config" xsi:type="object">Payments\ApplePay\Gateway\Config\Config</argument>
+            <argument name="requestDataBuilder" xsi:type="object">PaymentsApplePayHelperRefundRequestDataBuilder</argument>
         </arguments>
     </type>
-    
+
+    <virtualType name="PaymentsApplePayHelperRefundRequestDataBuilder" type="Payments\ApplePay\Helper\RequestDataBuilder">
+        <arguments>
+            <argument name="orderItemsBuilder" xsi:type="object">PaymentsCoreGatewaySoapRefundItemsDataBuilder</argument>
+        </arguments>
+    </virtualType>
+
     <virtualType name="PaymentsApplePayValueHandlerPool" type="Magento\Payment\Gateway\Config\ValueHandlerPool">
         <arguments>
             <argument name="handlers" xsi:type="array">

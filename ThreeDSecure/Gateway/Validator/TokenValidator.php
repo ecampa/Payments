@@ -22,9 +22,39 @@ class TokenValidator extends \Magento\Payment\Gateway\Validator\AbstractValidato
     private $signer;
 
     /**
-     * @var \Lcobucci\JWT\ValidationData
+     * @var \Lcobucci\JWT\Parser
      */
-    private $validationData;
+    private $parser;
+
+    /**
+     * @var \Lcobucci\JWT\Validation\Validator
+     */
+    private $validator;
+
+    /**
+     * @var \Lcobucci\JWT\Validation\Constraint\SignedWithFactory
+     */
+    private $signedWithConstraintFactory;
+
+    /**
+     * @var \Lcobucci\JWT\Signer\KeyFactory
+     */
+    private $keyFactory;
+
+    /**
+     * @var \Lcobucci\JWT\Validation\Constraint\ValidAtFactory
+     */
+    private $validAtFactory;
+
+    /**
+     * @var \Lcobucci\Clock\FrozenClockFactory
+     */
+    private $clockFactory;
+
+    /**
+     * @var \DateTimeImmutableFactory
+     */
+    private $dateTimeImmutableFactory;
 
     /**
      * @var \Magento\Framework\Stdlib\DateTime\DateTime
@@ -38,21 +68,38 @@ class TokenValidator extends \Magento\Payment\Gateway\Validator\AbstractValidato
      * @param \Payments\SecureAcceptance\Gateway\Helper\SubjectReader $subjectReader
      * @param \Payments\ThreeDSecure\Gateway\Config\Config $config
      * @param \Lcobucci\JWT\Signer\Hmac\Sha256 $signer
-     * @param \Lcobucci\JWT\ValidationData $validationData
+     * @param \Lcobucci\JWT\Parser $parser
+     * @param \Lcobucci\JWT\Validation\Validator $validator
+     * @param \Lcobucci\JWT\Validation\Constraint\SignedWithFactory $signedWithConstraintFactory
+     * @param \Lcobucci\JWT\Validation\Constraint\ValidAtFactory $validAtFactory
+     * @param \Lcobucci\JWT\Signer\KeyFactory $keyFactory
+     * @param \Magento\Framework\Stdlib\DateTime\DateTime $dateTime
      */
     public function __construct(
         \Magento\Payment\Gateway\Validator\ResultInterfaceFactory $resultFactory,
         \Payments\SecureAcceptance\Gateway\Helper\SubjectReader $subjectReader,
         \Payments\ThreeDSecure\Gateway\Config\Config $config,
         \Lcobucci\JWT\Signer\Hmac\Sha256 $signer,
-        \Lcobucci\JWT\ValidationData $validationData,
+        \Lcobucci\JWT\Parser $parser,
+        \Lcobucci\JWT\Validation\Validator $validator,
+        \Lcobucci\JWT\Validation\Constraint\SignedWithFactory $signedWithConstraintFactory,
+        \Lcobucci\JWT\Validation\Constraint\ValidAtFactory $validAtFactory,
+        \Lcobucci\Clock\FrozenClockFactory $clockFactory,
+        \DateTimeImmutableFactory $dateTimeImmutableFactory,
+        \Lcobucci\JWT\Signer\KeyFactory $keyFactory,
         \Magento\Framework\Stdlib\DateTime\DateTime $dateTime
     ) {
         parent::__construct($resultFactory);
         $this->subjectReader = $subjectReader;
         $this->config = $config;
         $this->signer = $signer;
-        $this->validationData = $validationData;
+        $this->parser = $parser;
+        $this->validator = $validator;
+        $this->signedWithConstraintFactory = $signedWithConstraintFactory;
+        $this->validAtFactory = $validAtFactory;
+        $this->clockFactory = $clockFactory;
+        $this->dateTimeImmutableFactory = $dateTimeImmutableFactory;
+        $this->keyFactory = $keyFactory;
         $this->dateTime = $dateTime;
     }
 
@@ -67,14 +114,51 @@ class TokenValidator extends \Magento\Payment\Gateway\Validator\AbstractValidato
     {
         /** @var \Lcobucci\JWT\Token $token */
         $token = $validationSubject['response'];
-        $key = $this->config->getApiKey();
-        if (!$token->verify($this->signer, $key)) {
+        if (!$this->validateSignature($token, $this->config->getApiKey())) {
             return $this->createResult(false, ['Invalid JWT token']);
         }
-        $this->validationData->setCurrentTime($this->dateTime->gmtTimestamp());
-        if (!$token->validate($this->validationData)) {
+        if (!$this->validateExpiration($token, $this->dateTime->gmtTimestamp())) {
             return $this->createResult(false, ['JWT token has expired']);
         }
         return $this->createResult(true);
+    }
+
+    /**
+     * @param \Lcobucci\JWT\Token $token
+     * @param string $key
+     *
+     * @return bool
+     */
+    private function validateSignature($token, $key)
+    {
+        return $this->validator->validate(
+            $token,
+            $this->signedWithConstraintFactory->create(
+                [
+                    'signer' => $this->signer,
+                    'key' => $this->keyFactory->create(['content' => $key]),
+                ]
+            )
+        );
+    }
+
+    /**
+     * @param \Lcobucci\JWT\Token $token
+     * @param $currentDate
+     *
+     * @return bool
+     */
+    private function validateExpiration($token, $currentDate)
+    {
+        return $this->validator->validate(
+            $token,
+            $this->validAtFactory->create(
+                [
+                    'clock' => $this->clockFactory->create(
+                        ['now' => $this->dateTimeImmutableFactory->create()->setTimestamp($currentDate)]
+                    ),
+                ]
+            )
+        );
     }
 }

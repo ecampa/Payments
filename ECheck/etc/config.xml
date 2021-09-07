@@ -16,8 +16,8 @@
                 <can_use_checkout>1</can_use_checkout>
                 <is_gateway>1</is_gateway>
                 <sort_order>40</sort_order>
-                <service_url></service_url>
-                <test_service_url></test_service_url>
+                <service_url/>
+                <test_service_url/>
                 <test_event_type>Final NSF</test_event_type>
                 <report_check_period>7</report_check_period>
                 <agreement_required>1</agreement_required>

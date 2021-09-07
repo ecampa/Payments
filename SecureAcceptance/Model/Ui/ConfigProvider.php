@@ -54,6 +54,7 @@ class ConfigProvider implements ConfigProviderInterface
                     "availableCardTypes" => $this->config->getCcTypes(),
                     "iframe_post" => !$this->config->getIsLegacyMode(),
                     "sa_type" => $this->config->getSaType(),
+                    'pass_expiration_date' => $this->config->getTokenPassExpirationDate(),
                 ],
                 self::CC_VAULT_CODE => [
                     "is_cvv_enabled" => $this->config->isCVVEnabled()

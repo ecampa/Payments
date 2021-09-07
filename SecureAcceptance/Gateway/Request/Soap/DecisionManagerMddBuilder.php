@@ -15,7 +15,7 @@ class DecisionManagerMddBuilder implements \Magento\Payment\Gateway\Request\Buil
     private $customerSession;
 
     /**
-     * @var \Magento\Checkout\Model\Session
+     * @var \Magento\Framework\Session\SessionManagerInterface
      */
     private $checkoutSession;
 
@@ -30,16 +30,40 @@ class DecisionManagerMddBuilder implements \Magento\Payment\Gateway\Request\Buil
     protected $giftMessageHelper;
 
     /**
+     * @var \Magento\Quote\Api\CartRepositoryInterface
+     */
+    private $cartRepository;
+
+    /**
      * @var \Magento\Backend\Model\Auth
      */
     private $auth;
 
+    /**
+     * @var \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory
+     */
+    private $orderGridCollectionFactory;
+
+    /**
+     * DecisionManagerMddBuilder constructor.
+     *
+     * @param \Payments\SecureAcceptance\Gateway\Helper\SubjectReader $subjectReader
+     * @param \Magento\Customer\Model\Session $customerSession
+     * @param \Magento\Framework\Session\SessionManagerInterface $checkoutSession
+     * @param \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $orderCollectionFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory
+     * @param \Magento\GiftMessage\Helper\Message $giftMessageHelper
+     * @param \Magento\Quote\Api\CartRepositoryInterface $cartRepository
+     * @param \Magento\Backend\Model\Auth $auth
+     */
     public function __construct(
         \Payments\SecureAcceptance\Gateway\Helper\SubjectReader $subjectReader,
         \Magento\Customer\Model\Session $customerSession,
-        \Magento\Checkout\Model\Session $checkoutSession,
+        \Magento\Framework\Session\SessionManagerInterface $checkoutSession,
         \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $orderCollectionFactory,
+        \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory,
         \Magento\GiftMessage\Helper\Message $giftMessageHelper,
+        \Magento\Quote\Api\CartRepositoryInterface $cartRepository,
         \Magento\Backend\Model\Auth $auth
     ) {
         $this->subjectReader = $subjectReader;
@@ -47,7 +71,9 @@ class DecisionManagerMddBuilder implements \Magento\Payment\Gateway\Request\Buil
         $this->checkoutSession = $checkoutSession;
         $this->orderCollectionFactory = $orderCollectionFactory;
         $this->giftMessageHelper = $giftMessageHelper;
+        $this->cartRepository = $cartRepository;
         $this->auth = $auth;
+        $this->orderGridCollectionFactory = $orderGridCollectionFactory;
     }
 
     /**
@@ -62,52 +88,58 @@ class DecisionManagerMddBuilder implements \Magento\Payment\Gateway\Request\Buil
         $paymentDO = $this->subjectReader->readPayment($buildSubject);
         $order = $paymentDO->getOrder();
 
-        $quote = $this->getQuote();
+        $quote = $this->getQuote($buildSubject);
 
         $request = [];
         $result = [];
 
-        $result['field1'] = (int)$this->customerSession->isLoggedIn();// Registered or Guest Account
-
-        $orders = $this->getOrders();
+        $result['1'] = (int)$this->customerSession->isLoggedIn();// Registered or Guest Account
 
         if ($this->customerSession->isLoggedIn()) {
-            $result['field2'] = $this->getAccountCreationDate(); // Account Creation Date
 
-            $result['field3'] = $orders->getSize(); // Purchase History Count
+            $orders = $this->getOrders($buildSubject);
+
+            $result['2'] = $this->getAccountCreationDate(); // Account Creation Date
+
+            $result['3'] = $orders->getSize(); // Purchase History Count
 
             if ($orders->getSize() > 0) {
-                $result['field4'] = $orders->getFirstItem()->getCreatedAt(); // Last Order Date
+                $result['4'] = $orders->getFirstItem()->getCreatedAt(); // Last Order Date
             }
 
-            $result['field5'] = $this->getAccountAge();// Member Account Age (Days)
+            $result['5'] = $this->getAccountAge();// Member Account Age (Days)
         }
 
-        $result['field6'] = (int)($orders->getSize() > 0); // Repeat Customer
-        $result['field20'] = $quote->getCouponCode(); //Coupon Code
+        $result['6'] = $this->isRepeatCustomer($order->getBillingAddress()->getEmail()); // Repeat Customer
+        $result['20'] = $quote->getCouponCode(); //Coupon Code
 
-        $result['field21'] = $quote->getBaseSubtotal() - $quote->getBaseSubtotalWithDiscount(); // Discount
+        $result['21'] = $quote->getBaseSubtotal() - $quote->getBaseSubtotalWithDiscount(); // Discount
 
-        $result['field22'] = $this->getGiftMessage(); // Gift Message
+        $result['22'] = $this->getGiftMessage($buildSubject); // Gift Message
 
-        $result['field23'] = ($this->auth->isLoggedIn()) ? 'call center' : 'web'; //order source
+        $result['23'] = ($this->auth->isLoggedIn()) ? 'call center' : 'web'; //order source
 
         if (!$quote->getIsVirtual()) {
             if ($shippingAddress = $quote->getShippingAddress()) {
-                $result['field31'] = $quote->getShippingAddress()->getShippingMethod();
-                $result['field32'] = $quote->getShippingAddress()->getShippingDescription();
+                $result['31'] = $quote->getShippingAddress()->getShippingMethod();
+                $result['32'] = $quote->getShippingAddress()->getShippingDescription();
             }
         }
 
         foreach ($result as $key => $value) {
-            if ($value !== null && !empty($value) && $value !== "" && $value !== null) {
-                $request['merchantDefinedData'][$key] = $value;
+            if (empty($value)) {
+                continue;
             }
+
+            $request['merchantDefinedData']['mddField'][] = [
+                '_' => $value,
+                'id' => $key,
+            ];
         }
 
         if ($fingerPrintId = $this->checkoutSession->getFingerprintId()) {
             $request['deviceFingerprintID'] = $fingerPrintId;
-
+            $request['deviceFingerprintRaw'] = true;
         }
 
         $request['billTo']['customerID'] = $order->getCustomerId();
@@ -116,15 +148,21 @@ class DecisionManagerMddBuilder implements \Magento\Payment\Gateway\Request\Buil
         return $request;
     }
 
-    private function getQuote()
+    private function getQuote($buildSubject)
     {
-        return $this->checkoutSession->getQuote();
+        if ($quote = $buildSubject['quote'] ?? null) {
+            return $quote;
+        }
+
+        // $this->checkoutSession->getQuote() method has a side effect of setting customerId from a session
+        // to the quote that breaks a compatibility with persistent shopping cart feature
+        return $this->cartRepository->get($this->checkoutSession->getQuoteId());
     }
 
-    private function getOrders()
+    private function getOrders($buildSubject)
     {
         $field = 'customer_email';
-        $value = $this->getQuote()->getCustomerEmail();
+        $value = $this->getQuote($buildSubject)->getCustomerEmail();
         if ($this->customerSession->isLoggedIn()) {
             $field = 'customer_id';
             $value = $this->customerSession->getCustomerId();
@@ -132,6 +170,17 @@ class DecisionManagerMddBuilder implements \Magento\Payment\Gateway\Request\Buil
         return $this->orderCollectionFactory->create()
             ->addFieldToFilter($field, $value)
             ->setOrder('created_at', 'desc');
+    }
+
+    private function isRepeatCustomer($customerEmail)
+    {
+        $orders = $this->orderGridCollectionFactory->create()
+            ->addFieldToFilter('customer_email', $customerEmail)
+        ;
+
+        $orders->getSelect()->limit(1);
+
+        return (int)($orders->getSize() > 0);
     }
 
     private function getAccountCreationDate()
@@ -144,9 +193,9 @@ class DecisionManagerMddBuilder implements \Magento\Payment\Gateway\Request\Buil
         return round((time() - strtotime($this->customerSession->getCustomerData()->getCreatedAt())) / (3600 * 24));
     }
 
-    private function getGiftMessage()
+    private function getGiftMessage($buildSubject)
     {
-        $message = $this->giftMessageHelper->getGiftMessage($this->getQuote()->getGiftMessageId());
+        $message = $this->giftMessageHelper->getGiftMessage($this->getQuote($buildSubject)->getGiftMessageId());
         return $message->getMessage() ? $message->getMessage() : '';
     }
 }

@@ -38,7 +38,7 @@ class PayerAuthValidateBuilder implements \Magento\Payment\Gateway\Request\Build
 
         /** @var \Lcobucci\JWT\Token $parsedToken */
         $parsedToken = $resultArray['parsedToken'];
-        $payload = $parsedToken->getClaim('Payload');
+        $payload = $parsedToken->claims()->get('Payload');
         $processorTransactionId = $payload->Payment->ProcessorTransactionId;
         return [
             'payerAuthValidateService' => [

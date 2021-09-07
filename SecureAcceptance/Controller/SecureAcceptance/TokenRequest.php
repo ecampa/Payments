@@ -96,10 +96,12 @@ class TokenRequest extends \Magento\Framework\App\Action\Action
                     \Payments\SecureAcceptance\Model\Ui\ConfigProvider::CODE => ['fields' => $commandResult->get()]
                 ]
             );
-
+        } catch (\Magento\Framework\Exception\LocalizedException $e) {
+            $this->logger->critical($e->getMessage(), ['exception' => $e]);
+            $result->setData(['error_messages' => $e->getMessage()]);
         } catch (\Exception $e) {
             $this->logger->critical($e->getMessage(), ['exception' => $e]);
-            $result->setData(['error' => __('Unable to build Token request')]);
+            $result->setData(['error_messages' => __('Unable to build Token request')]);
         }
 
         return $result;

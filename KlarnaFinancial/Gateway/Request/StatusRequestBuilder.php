@@ -30,9 +30,7 @@ class StatusRequestBuilder implements \Magento\Payment\Gateway\Request\BuilderIn
 
         $paymentDO = $this->subjectReader->readPayment($buildSubject);
         $order = $paymentDO->getOrder();
-
         $request = [
-            'merchantID' => $this->config->getMerchantId(),
             'merchantReferenceCode' => $order->getOrderIncrementId(),
             'apPaymentType' => \Payments\KlarnaFinancial\Helper\RequestDataBuilder::PAYMENT_TYPE,
             'apCheckStatusService' => [

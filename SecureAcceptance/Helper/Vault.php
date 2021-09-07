@@ -28,6 +28,10 @@ class Vault
     public function setVaultEnabled($vaultIsEnabled)
     {
         $this->checkoutSession->unsVaultIsEnabled();
+        $quote = $this->checkoutSession->getQuote();
+        $quote->getPayment()->setAdditionalInformation(\Magento\Vault\Model\Ui\VaultConfigProvider::IS_ACTIVE_CODE, (bool)$vaultIsEnabled);
+        $quote->save();
+
         if ($vaultIsEnabled) {
             $this->checkoutSession->setVaultIsEnabled($vaultIsEnabled);
         }

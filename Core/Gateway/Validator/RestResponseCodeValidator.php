@@ -6,6 +6,7 @@ class RestResponseCodeValidator extends \Magento\Payment\Gateway\Validator\Abstr
 {
 
     const RESPONSE_CODE_OK = 200;
+    const RESPONSE_CODE_CREATED = 201;
     const RESPONSE_CODE_NOT_FOUND = 404;
     const RESPONSE_CODE_UNAUTHORIZED = 401;
     const RESPONSE_CODE_BAD_REQUEST = 400;
@@ -14,13 +15,19 @@ class RestResponseCodeValidator extends \Magento\Payment\Gateway\Validator\Abstr
      * @var \Payments\Core\Gateway\Helper\SubjectReader
      */
     private $subjectReader;
+    /**
+     * @var int
+     */
+    private $validResponseCode;
 
     public function __construct(
         \Magento\Payment\Gateway\Validator\ResultInterfaceFactory $resultFactory,
-        \Payments\Core\Gateway\Helper\SubjectReader $subjectReader
+        \Payments\Core\Gateway\Helper\SubjectReader $subjectReader,
+        $validResponseCode = self::RESPONSE_CODE_OK
     ) {
         parent::__construct($resultFactory);
         $this->subjectReader = $subjectReader;
+        $this->validResponseCode = $validResponseCode;
     }
 
     /**
@@ -37,8 +44,10 @@ class RestResponseCodeValidator extends \Magento\Payment\Gateway\Validator\Abstr
             throw new \Payments\Core\Gateway\Validator\NotFoundException('No data found.');
         }
 
-        if ($httpCode != self::RESPONSE_CODE_OK) {
-            return $this->createResult(false, ['REST API returned invalid response code: ' . $httpCode]);
+        if ($httpCode != $this->validResponseCode) {
+            return $this->createResult(false, [
+                __($result['errorInformation']['message'] ?? 'Gateway rejected the transaction.')
+            ]);
         }
 
         return $this->createResult(true);

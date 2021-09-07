@@ -63,7 +63,6 @@ abstract class AbstractResponseHandler
         $payment->setAdditionalInformation(self::REASON_CODE, $response[self::REASON_CODE]);
         $payment->setAdditionalInformation(self::DECISION, $response[self::DECISION]);
         $payment->setAdditionalInformation(self::MERCHANT_REFERENCE_CODE, $response[self::MERCHANT_REFERENCE_CODE]);
-        $payment->setAdditionalInformation(self::RECONCILIATION_ID, $response['ccAuthReply']->{self::RECONCILIATION_ID});
         $payment->setAdditionalInformation(self::AUTHORIZATION_CODE, $response['ccAuthReply']->{self::AUTHORIZATION_CODE});
 
         return $payment;

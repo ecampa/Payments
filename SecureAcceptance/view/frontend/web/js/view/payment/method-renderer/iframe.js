@@ -23,8 +23,21 @@ define([
         },
         getData: function () {
             var data = {
-                'method': this.getCode()
+                'method': this.getCode(),
+                'additional_data': {}
             };
+
+            if (this.getPassExpDate()) {
+                data = $.extend(data, {
+                    'additional_data': {
+                        'expDate': this.creditCardExpMonth() + '-' + this.creditCardExpYear()
+                    }
+                });
+            }
+
+            if (this.getUseCvn()) {
+                data.additional_data.cvv = this.creditCardVerificationNumber();
+            }
 
             this.vaultEnabler.visitAdditionalData(data);
 
@@ -47,6 +60,20 @@ define([
         },
         setValidateHandler: function (handler) {
             this.validateHandler = handler;
+        },
+        getUseCvn: function () {
+            return !window.checkoutConfig.payment[this.getCode()].ignore_cvn;
+        },
+        getPassExpDate: function () {
+            return !!window.checkoutConfig.payment[this.getCode()].pass_expiration_date;
+        },
+        getHiddenFormTpl: function () {
+            return  '<form target="<%= data.target %>" action="<%= data.action %>" method="POST" ' +
+                'hidden enctype="application/x-www-form-urlencoded" class="no-display">' +
+                '<% _.each(data.inputs, function(val, key){ %>' +
+                '<input value="<%- val %>" name="<%- key %>" type="hidden">' +
+                '<% }); %>' +
+                '</form>';
         },
         placeOrder: function () {
             if (this.validateHandler() && additionalValidators.validate()) {

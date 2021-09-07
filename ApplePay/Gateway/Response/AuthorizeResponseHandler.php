@@ -57,5 +57,10 @@ class AuthorizeResponseHandler extends \Payments\ApplePay\Gateway\Response\Abstr
         $payment = $this->handleAuthorizeResponse($payment, $response);
 
         $payment->setIsTransactionClosed(false);
+
+        $payment->setAdditionalInformation(
+            self::RECONCILIATION_ID,
+            $response['ccAuthReply']->{self::RECONCILIATION_ID} ?? null
+        );
     }
 }

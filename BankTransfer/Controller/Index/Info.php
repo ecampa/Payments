@@ -1,7 +1,7 @@
 <?php
 namespace Payments\BankTransfer\Controller\Index;
 
-use Payments\Core\Service\GatewaySoapApi;
+use Payments\BankTransfer\Service\IdealSoap;
 use Magento\Framework\App\Action\Context;
 use Magento\Checkout\Model\Session;
 use Magento\Quote\Model\QuoteManagement;
@@ -36,7 +36,10 @@ class Info extends \Magento\Framework\App\Action\Action
      */
     protected $_customerSession;
 
-    protected $gatewayApi;
+    /**
+     * @var IdealSoap
+     */
+    protected $_gatewayAPI;
 
     /**
      * @var OrderPaymentRepositoryInterface
@@ -59,6 +62,7 @@ class Info extends \Magento\Framework\App\Action\Action
      * @var \Payments\BankTransfer\Model\IdealOption
      */
     private $idealOption;
+
     
     /**
      * Receipt constructor.
@@ -68,6 +72,7 @@ class Info extends \Magento\Framework\App\Action\Action
      * @param Cart $cart
      * @param StoreManagerInterface $storeManager
      * @param \Magento\Customer\Model\Session $customerSession
+     * @param array $gatewayAPI
      * @param OrderPaymentRepositoryInterface $orderPaymentRepository
      * @param \Magento\Framework\Controller\Result\JsonFactory $resultJsonFactory
      * @param \Payments\BankTransfer\Model\IdealOption $idealOption
@@ -79,7 +84,7 @@ class Info extends \Magento\Framework\App\Action\Action
         Cart $cart,
         StoreManagerInterface $storeManager,
         \Magento\Customer\Model\Session $customerSession,
-        \Payments\Core\Service\GatewaySoapApi $gatewayApi,
+        \Payments\BankTransfer\Service\IdealSoap $gatewayAPI,
         OrderPaymentRepositoryInterface $orderPaymentRepository,
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
         \Magento\Framework\Controller\Result\JsonFactory $resultJsonFactory,
@@ -90,7 +95,7 @@ class Info extends \Magento\Framework\App\Action\Action
         $this->_cart = $cart;
         $this->_storeManager = $storeManager;
         $this->_customerSession = $customerSession;
-        $this->gatewayApi = $gatewayApi;
+        $this->_gatewayAPI = $gatewayAPI;
         $this->_orderPaymentRepository = $orderPaymentRepository;
         $this->scopeConfig = $scopeConfig;
         $this->resultJsonFactory = $resultJsonFactory;
@@ -115,12 +120,14 @@ class Info extends \Magento\Framework\App\Action\Action
             }
             $data[$option->getData('option_id')] = $option->getData('option_name');
         }
+
         if ($needUpdate || empty($data)) {
             foreach ($this->idealOption->getCollection() as $option) {
                 $option->delete();
             }
             $quote = $this->_session->getQuote();
-            $data = $this->gatewayApi->getListOfBanks($quote->getId(), $this->scopeConfig->getValue("payment/payments_bank_transfer/ideal_merchant_id", \Magento\Store\Model\ScopeInterface::SCOPE_STORE));
+
+            $data = $this->_gatewayAPI->getListOfBanks($quote->getId());
             foreach ($data as $optionId => $optionName) {
                 $this->idealOption->setData([
                     'created_date' => gmdate("Y-m-d\\TH:i:s\\Z"),

@@ -17,6 +17,7 @@ class PaymentTokenManagement extends \Magento\Vault\Model\PaymentTokenManagement
 {
 
     const KEY_GATEWAY_PAYMENT_TOKEN = 'gateway_token';
+    const KEY_GATEWAY_INSTRUMENT_ID = 'gateway_instrument_id';
 
     /**
      * @var DateTimeFactory
@@ -27,6 +28,11 @@ class PaymentTokenManagement extends \Magento\Vault\Model\PaymentTokenManagement
      * @var \Magento\Vault\Model\PaymentTokenManagement
      */
     private $paymentTokenManagement;
+
+    /**
+     * @var \Magento\Framework\Serialize\SerializerInterface
+     */
+    private $serializer;
 
     /**
      * @param PaymentTokenRepositoryInterface $repository
@@ -48,7 +54,8 @@ class PaymentTokenManagement extends \Magento\Vault\Model\PaymentTokenManagement
         SearchCriteriaBuilder $searchCriteriaBuilder,
         PaymentTokenSearchResultsInterfaceFactory $searchResultsFactory,
         EncryptorInterface $encryptor,
-        DateTimeFactory $dateTimeFactory
+        DateTimeFactory $dateTimeFactory,
+        \Magento\Framework\Serialize\SerializerInterface $serializer
     ) {
         parent::__construct(
             $repository,
@@ -62,6 +69,7 @@ class PaymentTokenManagement extends \Magento\Vault\Model\PaymentTokenManagement
         );
         $this->dateTimeFactory = $dateTimeFactory;
         $this->paymentTokenManagement = $paymentTokenManagement;
+        $this->serializer = $serializer;
     }
 
     /**
@@ -156,6 +164,47 @@ class PaymentTokenManagement extends \Magento\Vault\Model\PaymentTokenManagement
 
         if (!is_null($vaultPaymentToken) && !$vaultPaymentToken->isEmpty()) {
             return $vaultPaymentToken->getGatewayToken();
+        }
+
+        return null;
+    }
+
+    /**
+     * @param \Magento\Payment\Model\InfoInterface $payment
+     * @param string $instrumentId
+     */
+    public function storeInstrumentIdIntoPayment(\Magento\Payment\Model\InfoInterface $payment, $instrumentId)
+    {
+        $payment->setAdditionalInformation(self::KEY_GATEWAY_INSTRUMENT_ID, $instrumentId);
+    }
+
+    public function getInstrumentIdFromPayment(\Magento\Payment\Model\InfoInterface $payment)
+    {
+        return $payment->getAdditionalInformation(self::KEY_GATEWAY_INSTRUMENT_ID);
+    }
+
+    public function getCustomerTokenWithInstrumentIdentifier($customerId, $instrumentIdentifierId)
+    {
+        if (!$customerId) {
+            throw new \InvalidArgumentException('Customer Id must be provided.');
+        }
+
+        if (!$instrumentIdentifierId) {
+            throw new \InvalidArgumentException('InstrumentIdentifier Id must be provided.');
+        }
+
+        $tokens = $this->getVisibleAvailableTokens($customerId);
+
+        foreach ($tokens as $token) {
+            try {
+                $details = $this->serializer->unserialize($token->getTokenDetails());
+            } catch (\InvalidArgumentException $e) {
+                continue;
+            }
+
+            if (($details['instrumentIdentifierID'] ?? null) == $instrumentIdentifierId) {
+                return $token;
+            }
         }
 
         return null;

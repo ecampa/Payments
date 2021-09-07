@@ -9,8 +9,12 @@ class Fingerprint extends \Magento\Framework\View\Element\Template
      * @var \Magento\Checkout\Model\Session
      */
     private $checkoutSession;
+    /**
+     * @var string
+     */
+    private $sessionId;
 
-   /**
+    /**
     * Constructor
     *
     * @param \Magento\Framework\View\Element\Template\Context $context
@@ -22,6 +26,8 @@ class Fingerprint extends \Magento\Framework\View\Element\Template
         array $data = []
     ) {
         $this->checkoutSession = $checkoutSession;
+        $this->sessionId = $this->checkoutSession->getQuote()->getId().time();
+
         parent::__construct($context, $data);
     }
 
@@ -48,27 +54,21 @@ class Fingerprint extends \Magento\Framework\View\Element\Template
 
         return null;
     }
-    
+
     private function composeUrlParams()
     {
         $orgId = $this->getOrgId();
-        $sessionId = $this->checkoutSession->getQuote()->getId().time();
-        $merchantId = $this->_scopeConfig->getValue(
-            "payment/payments_sa/merchant_id",
-            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
-        );
-        if ($this->_scopeConfig->getValue(
-            "payment/payments_sa/fingerprint_enabled",
-            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
-        )) {
-            $this->checkoutSession->setFingerprintId($sessionId);
-            return 'org_id='.$orgId.'&session_id='.$merchantId.$sessionId;
-        } else {
+
+        if ($this->isFingerprintEnabled()) {
+            $this->checkoutSession->setFingerprintId($this->sessionId);
+            return 'org_id='.$orgId.'&session_id='.$this->sessionId;
+        }
+        else {
             $this->checkoutSession->setFingerprintId(null);
-            return 'session_id='.$merchantId.$sessionId;
+            return 'session_id='.$this->sessionId;
         }
     }
-    
+
     public function isFingerprintEnabled()
     {
         return $this->_scopeConfig->getValue(

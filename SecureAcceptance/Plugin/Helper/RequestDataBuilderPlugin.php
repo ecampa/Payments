@@ -16,6 +16,11 @@ class RequestDataBuilderPlugin
     private $urlBuilder;
 
     /**
+     * @var \Payments\SecureAcceptance\Gateway\Config\SaConfigProviderInterface
+     */
+    private $configProvider;
+
+    /**
      * @var \Payments\SecureAcceptance\Gateway\Config\Config
      */
     private $config;
@@ -40,12 +45,14 @@ class RequestDataBuilderPlugin
      */
     public function __construct(
         \Payments\SecureAcceptance\Gateway\Config\Config $config,
+        \Payments\SecureAcceptance\Gateway\Config\SaConfigProviderInterface $configProvider,
         \Magento\Framework\UrlInterface $urlBuilder,
         \Magento\Framework\App\RequestInterface $request,
         \Magento\Framework\Session\SessionManagerInterface $checkoutSession,
         \Magento\Framework\Encryption\EncryptorInterface $encryptor
     ) {
         $this->config = $config;
+        $this->configProvider = $configProvider;
         $this->urlBuilder = $urlBuilder;
         $this->request = $request;
         $this->checkoutSession = $checkoutSession;
@@ -69,18 +76,16 @@ class RequestDataBuilderPlugin
 
         $result['override_custom_receipt_page'] = $this->getCustomReceiptPageUrl();
 
-        if ($this->config->isSilent()) {
-            $result[\Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_SID] = $this->encryptor->encrypt($this->checkoutSession->getSessionId());
-        }
-
         unset($result['device_fingerprint_id']);
         unset($result['customer_ip_address']);
         unset($result['signed_field_names']);
         unset($result['signature']);
-        $result['access_key'] = $this->getSopAccessKey();
-        $result['profile_id'] = $this->getSopProfileId();
+        $result[\Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_SCOPE] = \Magento\Backend\App\Area\FrontNameResolver::AREA_CODE;
+        $storeId = $result[\Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_STORE_ID] ?? null;
+        $result['access_key'] = $this->configProvider->getAccessKey($storeId);
+        $result['profile_id'] = $this->configProvider->getProfileId($storeId);
         $result['signed_field_names'] = $subject->getSignedFields($result);
-        $result['signature'] = $subject->sign($result, $this->getSopSecretKey());
+        $result['signature'] = $subject->sign($result, $this->configProvider->getSecretKey($storeId));
 
         return $result;
     }
@@ -103,10 +108,12 @@ class RequestDataBuilderPlugin
 
         unset($result['signed_field_names']);
         unset($result['signature']);
-        $result['access_key'] = $this->getAccessKey();
-        $result['profile_id'] = $this->getProfileId();
+        $result[\Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_SCOPE] = \Magento\Backend\App\Area\FrontNameResolver::AREA_CODE;
+        $storeId = $result[\Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_STORE_ID] ?? null;
+        $result['access_key'] = $this->configProvider->getAccessKey($storeId);
+        $result['profile_id'] = $this->configProvider->getProfileId($storeId);
         $result['signed_field_names'] = $subject->getSignedFields($result);
-        $result['signature'] = $subject->sign($result, $this->getSecretKey());
+        $result['signature'] = $subject->sign($result, $this->configProvider->getSecretKey($storeId));
 
         return $result;
     }
@@ -125,49 +132,4 @@ class RequestDataBuilderPlugin
         return $this->checkoutSession->getQuote();
     }
 
-    private function getSopProfileId()
-    {
-        return $this->config->getValue(\Payments\SecureAcceptance\Gateway\Config\Config::KEY_SOP_PROFILE_ID,
-            $this->getQuote()->getStoreId());
-    }
-
-    private function getSopAccessKey()
-    {
-        return $this->config->getValue(
-            \Payments\SecureAcceptance\Gateway\Config\Config::KEY_SOP_ACCESS_KEY,
-            $this->getQuote()->getStoreId()
-        );
-    }
-
-    private function getSopSecretKey()
-    {
-        return $this->config->getValue(
-            \Payments\SecureAcceptance\Gateway\Config\Config::KEY_SOP_SECRET_KEY,
-            $this->getQuote()->getStoreId()
-        );
-    }
-
-    private function getProfileId()
-    {
-        return $this->config->getValue(
-            \Payments\SecureAcceptance\Gateway\Config\Config::KEY_PROFILE_ID,
-            $this->getQuote()->getStoreId()
-        );
-    }
-
-    private function getAccessKey()
-    {
-        return $this->config->getValue(
-            \Payments\SecureAcceptance\Gateway\Config\Config::KEY_ACCESS_KEY,
-            $this->getQuote()->getStoreId()
-        );
-    }
-
-    private function getSecretKey()
-    {
-        return $this->config->getValue(
-            \Payments\SecureAcceptance\Gateway\Config\Config::KEY_SECRET_KEY,
-            $this->getQuote()->getStoreId()
-        );
-    }
 }

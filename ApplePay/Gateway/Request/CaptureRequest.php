@@ -15,7 +15,8 @@ class CaptureRequest extends \Payments\ApplePay\Gateway\Request\AbstractRequest 
     {
         $request = $this->requestDataBuilder->buildCaptureRequestData(
             $this->getValidPaymentInstance($buildSubject),
-            $this->subjectReader->readAmount($buildSubject)
+            $this->subjectReader->readAmount($buildSubject),
+            $buildSubject
         );
 
         return (array) $request;

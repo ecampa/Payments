@@ -5,10 +5,7 @@
             <payments_sa>
                 <active>1</active>
                 <dm_fail_sender>general</dm_fail_sender>
-                <dm_fail_template>payment_payments_section_payments_general_dm_fail_template</dm_fail_template>
-                <secureacceptance_type>web</secureacceptance_type>
-                <service_url>{{serviceUrl}}</service_url>
-                <service_url_test>{{testServiceUrl}}</service_url_test>
+                <dm_fail_template>payment_payments_section_payments_dm_dm_fail_template</dm_fail_template>
                 <can_authorize>1</can_authorize>
                 <can_capture>1</can_capture>
                 <can_void>1</can_void>
@@ -23,8 +20,8 @@
                 <report_password backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
                 <transaction_key backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
                 <rest_key_value backend_model="Magento\Config\Model\Config\Backend\Encrypted"/>
-                <path_to_wsdl>{{wsdlPath}}</path_to_wsdl>
-                <path_to_test_wsdl>{{testWsdlPath}}</path_to_test_wsdl>
+                <path_to_wsdl>https://ics2ws.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.170.wsdl</path_to_wsdl>
+                <path_to_test_wsdl>https://ics2wstesta.ic3.com/commerce/1.x/transactionProcessor/CyberSourceTransaction_1.170.wsdl</path_to_test_wsdl>
                 <enable_dm_cron>1</enable_dm_cron>
                 <show_exact_error>0</show_exact_error>
             </payments_sa>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Module/etc/module.xsd">
+    <module name="Payments_GooglePay" setup_version="3.2.4">
+        <sequence>
+            <module name="Payments_Core"/>
+        </sequence>
+    </module>
+</config>

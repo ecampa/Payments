@@ -11,7 +11,17 @@ define(
         'Payments_SecureAcceptance/js/action/microform/get-token',
         'Payments_SecureAcceptance/js/model/credit-card-validation/microform-credit-card-validation'
     ]
-    , function ($, _, Component, FLEX, cardTypeMap, additionalValidators, VaultEnabler, errorProcessor, getTokenAction) {
+    , function (
+        $,
+        _,
+        Component,
+        Flex,
+        cardTypeMap,
+        additionalValidators,
+        VaultEnabler,
+        errorProcessor,
+        getTokenAction
+    ) {
         'use strict';
 
         return Component.extend({
@@ -28,6 +38,7 @@ define(
             microformInitialized: false,
             containerSelector: '#flex-cc-number',
             labelSelector: '#cardNumber-label',
+            containerSelectorCvn: '#flex-cc-cvn',
             initialize: function () {
                 this._super();
                 this.vaultEnabler = new VaultEnabler();
@@ -47,34 +58,47 @@ define(
                 this.microformInitialized = true;
 
                 getTokenAction(this.messageContainer, this.getData()).then(function (token) {
-                    FLEX.FLEX.microform(
-                        {
-                            keyId: token.kid,
-                            keystore: token,
-                            container: this.containerSelector,
-                            label: this.labelSelector,
-                            placeholder: '',
-                            styles: this.getStyles(),
-                            encryptionType: 'rsaoaep256'
-                        },
-                        this.flexInitCallback.bind(this)
-                    );
+
+                    try {
+                        var flex = new Flex.Flex(token),
+                            microform = flex.microform({styles: this.getStyles()}),
+                            number = microform.createField(
+                                'number',
+                                {
+                                    placeholder: '',
+                                    autoformat: false
+                                }
+                            );
+
+                        number.load(this.containerSelector);
+
+                        number.on('change', this.cardTypeChangeHandler.bind(this));
+                        number.on('change', this.validationChangeHandler.bind(this));
+                        number.on('autocomplete', this.cardAutofillHandler.bind(this));
+
+                        this.microform = microform;
+
+                        if (!this.hasVerification()) {
+                            return;
+                        }
+
+                        var securityCode = microform.createField(
+                            'securityCode',
+                            {
+                                placeholder: '',
+                                styles: this.getStyles()
+                            }
+                        );
+
+                        securityCode.load(this.containerSelectorCvn);
+
+                        securityCode.on('change', this.validationChangeHandlerCvn.bind(this));
+
+                    } catch (e) {
+                        console.log(e);
+                    }
+
                 }.bind(this));
-            },
-            flexInitCallback: function (error, microform) {
-                this.microformInitialized = true;
-
-                if (error) {
-                    alert(error);
-                    console.log('Init error: ', error);
-                    return;
-                }
-                microform.on('cardTypeChange', this.cardTypeChangeHandler.bind(this));
-                microform.on('autocomplete', this.cardAutofillHandler.bind(this));
-                microform.on('validationChange', this.validationChangeHandler.bind(this));
-
-                this.microform = microform;
-
             },
             initObservable: function () {
                 this._super()
@@ -96,16 +120,13 @@ define(
             },
             getData: function () {
 
-                var microformResponse = _.pick(
-                    this.microformResponse,
-                    function (value) {
-                        return !_.isObject(value);
-                    }),
-                    data = {
+                var data = {
                         'method': this.getCode(),
-                        'additional_data': $.extend({}, microformResponse, {
+                        'additional_data': $.extend({}, {
                             'cvv': this.creditCardVerificationNumber(),
-                            'expDate': this.padMonth(this.creditCardExpMonth()) + '-' + this.creditCardExpYear()
+                            'expDate': this.padMonth(this.creditCardExpMonth()) + '-' + this.creditCardExpYear(),
+                            'token': this.microformResponse,
+                            'ccType': this.creditCardType()
                         })
                     }
                 ;
@@ -139,22 +160,21 @@ define(
             getVaultCode: function () {
                 return window.checkoutConfig.payment[this.getCode()].vaultCode;
             },
+            getAvailableCardTypes: function () {
+                return window.checkoutConfig.payment[this.getCode()].availableCardTypes || '';
+            },
             cardAutofillHandler: function (cardData) {
 
                 if (!cardData) {
                     return;
                 }
 
-                if (cardData.code) {
-                    this.creditCardVerificationNumber(cardData.code);
+                if (cardData.expirationMonth && parseInt(cardData.expirationMonth, 10)) {
+                    this.creditCardExpMonth(parseInt(cardData.expirationMonth, 10));
                 }
 
-                if (cardData.cardExpirationMonth && parseInt(cardData.cardExpirationMonth, 10)) {
-                    this.creditCardExpMonth(parseInt(cardData.cardExpirationMonth, 10));
-                }
-
-                if (cardData.cardExpirationYear) {
-                    this.creditCardExpYear(cardData.cardExpirationYear);
+                if (cardData.expirationYear) {
+                    this.creditCardExpYear(cardData.expirationYear);
                 }
             },
             cardTypeChangeHandler: function (event) {
@@ -172,13 +192,29 @@ define(
                 this.creditCardType(magentoType);
                 this.selectedCardType(magentoType);
             },
+            validateCardType: function () {
+                var
+                    cardType = this.creditCardType(),
+                    availableTypes = this.getAvailableCardTypes(),
+                    isValid;
+
+                isValid = cardType && availableTypes && availableTypes.split(',').indexOf(cardType) !== -1;
+
+                $(this.containerSelector).attr('data-valid-type', isValid);
+            },
             validationChangeHandler: function (data) {
                 $(this.containerSelector).attr('data-valid', data.valid);
+            },
+            validationChangeHandlerCvn: function (data) {
+                $(this.containerSelectorCvn).attr('data-valid', data.valid);
             },
             validate: function () {
                 var form = $('#payments_sa_form'),
                     formValid
                 ;
+
+                this.validateCardType();
+
                 formValid = form.validation && form.validation('isValid');
                 return formValid;
             },
@@ -200,20 +236,22 @@ define(
                     return;
                 }
 
+                this.isPlaceOrderActionAllowed(false);
+
                 this.microform.createToken(
                     {
                         cardExpirationMonth: this.padMonth(this.creditCardExpMonth()),
                         cardExpirationYear: this.creditCardExpYear()
                     },
                     function (err, response) {
+                        this.isPlaceOrderActionAllowed(true);
+
                         if (err) {
                             errorProcessor.process(err, this.messageContainer);
                             return;
                         }
-
                         this.microformResponse = response;
                         this.placeOrderContinue(data, event, _super);
-                       
                     }.bind(this)
                 );
             }

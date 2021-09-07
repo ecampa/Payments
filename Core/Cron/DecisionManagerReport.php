@@ -148,22 +148,42 @@ class DecisionManagerReport
         return $this;
     }
 
-    public function runReport($storeId)
+    public function getExceptions()
     {
-        $parsedXml = $this->conversionReportCommand->execute(['store_id' => $storeId])->get();
+        return $this->exceptions;
+    }
 
-        foreach ($parsedXml as $incrementId => $value) {
+    public function runReport($storeId, $startTime = null)
+    {
+        $request = ['store_id' => $storeId, 'startTime' => $startTime];
+        $parsedXml = $this->conversionReportCommand->execute($request)->get();
+
+        foreach ($parsedXml as $value) {
+            $incrementId = $value['order_increment_id'];
             $order = $this->orderFactory->create()->loadByIncrementId($incrementId);
+
+            if (!$order->getId()) {
+                continue;
+            }
+
             $payment = $order->getPayment();
 
-            if ($order && $payment && $payment->getCcTransId() == $value['transaction_id'] && !in_array($order->getState(), self::$skipStatuses)) {
+            if (!$payment || !$payment->getId()) {
+                continue;
+            }
 
-                try {
-                    $this->updatePayment($order, $value);
-                } catch (\Exception $e) {
-                    $this->buildExceptionOutput($order, $e->getMessage());
-                    continue;
-                }
+            if (
+                $payment->getCcTransId() != $value['transaction_id']
+                || in_array($order->getState(), self::$skipStatuses)
+            ) {
+                continue;
+            }
+
+            try {
+                $this->updatePayment($order, $value);
+            } catch (\Exception $e) {
+                $this->buildExceptionOutput($order, $e->getMessage());
+                continue;
             }
         }
 

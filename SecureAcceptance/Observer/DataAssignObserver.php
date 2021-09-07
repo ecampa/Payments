@@ -13,7 +13,9 @@ class DataAssignObserver extends AbstractDataAssignObserver
     const KEY_FLEX_SIGNED_FIELDS = 'signedFields';
     const KEY_FLEX_SIGNATURE = 'signature';
     const KEY_FLEX_TOKEN = 'token';
-    const KEY_FLEX_EXP_DATE = 'expDate';
+    const KEY_CARD_TYPE = 'ccType';
+    const KEY_EXP_DATE = 'expDate';
+    const KEY_FLEX_MASKED_PAN = 'maskedPan';
 
     /**
      * @var \Magento\Framework\Session\SessionManagerInterface
@@ -31,18 +33,25 @@ class DataAssignObserver extends AbstractDataAssignObserver
     private $paymentTokenManagement;
 
     /**
+     * @var \Payments\SecureAcceptance\Model\Jwt\JwtProcessorInterface
+     */
+    private $jwtProcessor;
+
+    /**
      * @param \Magento\Framework\Session\SessionManagerInterface $session
      * @param \Payments\SecureAcceptance\Model\PaymentTokenManagement $paymentTokenManagement
      * @param \Payments\SecureAcceptance\Gateway\Config\Config $config
      */
     public function __construct(
         \Magento\Framework\Session\SessionManagerInterface $session,
+        \Payments\SecureAcceptance\Model\Jwt\JwtProcessorInterface $jwtProcessor,
         \Payments\SecureAcceptance\Model\PaymentTokenManagement $paymentTokenManagement,
         \Payments\SecureAcceptance\Gateway\Config\Config $config
     ) {
         $this->session = $session;
         $this->config = $config;
         $this->paymentTokenManagement = $paymentTokenManagement;
+        $this->jwtProcessor = $jwtProcessor;
     }
 
     /**
@@ -52,7 +61,9 @@ class DataAssignObserver extends AbstractDataAssignObserver
     public function execute(Observer $observer)
     {
         $this->assignMicroformData($observer);
+        $this->assignCardType($observer);
         $this->assignCvv($observer);
+        $this->assignCardExpirationDate($observer);
     }
 
     private function assignMicroformData($observer)
@@ -69,33 +80,37 @@ class DataAssignObserver extends AbstractDataAssignObserver
         $additionalData = new DataObject($additionalData);
         $payment = $this->readPaymentModelArgument($observer);
 
-        if ($token = $additionalData->getDataByKey(static::KEY_FLEX_TOKEN)) {
-            $this->paymentTokenManagement->storeTokenIntoPayment($payment, $token);
+        if (!$token = $additionalData->getDataByKey(static::KEY_FLEX_TOKEN)) {
+            return;
         }
 
-        if ($expDate = $additionalData->getDataByKey(static::KEY_FLEX_EXP_DATE)) {
-            $payment->setAdditionalInformation(static::KEY_FLEX_EXP_DATE, $expDate);
+        $payment->setAdditionalInformation('flexJwt', $token);
+
+        if ($flexPaymentToken = $this->jwtProcessor->getFlexPaymentToken($token)) {
+            $payment->setAdditionalInformation('transientToken', $flexPaymentToken);
         }
 
-        if ($signedFields = $additionalData->getDataByKey(static::KEY_FLEX_SIGNED_FIELDS)) {
-            $payment->setAdditionalInformation(static::KEY_FLEX_SIGNED_FIELDS, $signedFields);
-            foreach (explode(',', $signedFields) as $field) {
-                $payment->setAdditionalInformation($field, $additionalData->getDataByKey($field));
-            }
+        if ($cardData = $this->jwtProcessor->getCardData($token)) {
+            $payment->setAdditionalInformation(static::KEY_FLEX_MASKED_PAN, $cardData['number'] ?? null);
+            $payment->setAdditionalInformation('cardType', $cardData['type'] ?? null);
         }
 
-        if ($signature = $additionalData->getDataByKey(static::KEY_FLEX_SIGNATURE)) {
-            $payment->setAdditionalInformation(static::KEY_FLEX_SIGNATURE, $signature);
-        }
     }
 
     private function assignCvv($observer)
     {
         $data = $this->readDataArgument($observer);
 
-        if ((!$this->_isVaultCCMethod($data) || !$this->_isCvvEnabled()) && !$this->config->isMicroform()) {
+        // Passing CVN for:
+        // stored cards+config CVN enabled
+        // or Secure acceptance (i.e. not microform)
+        if (
+            (!$this->_isVaultCCMethod($data) || !$this->_isCvvEnabled())
+            && $this->config->isMicroform()
+        ) {
             return;
         }
+
         $additionalData = $data->getData(PaymentInterface::KEY_ADDITIONAL_DATA);
         if (!is_array($additionalData)) {
             return;
@@ -132,5 +147,53 @@ class DataAssignObserver extends AbstractDataAssignObserver
     {
         return
             $this->config->getValue("enable_cvv") || $this->config->getValue("enable_admin_cvv");
+    }
+
+    private function assignCardType(Observer $observer)
+    {
+        if (
+            !$this->config->isMicroform()
+            && !$this->config->isSilent()
+        ) {
+            return;
+        }
+
+        $data = $this->readDataArgument($observer);
+
+        $additionalData = $data->getData(PaymentInterface::KEY_ADDITIONAL_DATA);
+
+        $additionalData = new DataObject($additionalData);
+        $payment = $this->readPaymentModelArgument($observer);
+
+        if (!$cardType = $additionalData->getDataByKey(static::KEY_CARD_TYPE)) {
+            return;
+        }
+
+        $payment->setAdditionalInformation('cardType', $cardType);
+    }
+
+    private function assignCardExpirationDate(Observer $observer)
+    {
+        if (
+            !$this->config->isMicroform()
+            && !(
+                !$this->config->getIsLegacyMode()
+                && $this->config->isSilent()
+                && $this->config->getTokenPassExpirationDate()
+            )
+        ) {
+            return;
+        }
+
+        $data = $this->readDataArgument($observer);
+
+        $additionalData = $data->getData(PaymentInterface::KEY_ADDITIONAL_DATA);
+
+        $additionalData = new DataObject($additionalData);
+        $payment = $this->readPaymentModelArgument($observer);
+
+        if ($ccExpDate = $additionalData->getDataByKey(static::KEY_EXP_DATE)) {
+            $payment->setAdditionalInformation(static::KEY_EXP_DATE, $ccExpDate);
+        }
     }
 }

@@ -13,8 +13,8 @@ use Magento\Payment\Gateway\Http\TransferInterface;
 
 class Rest implements ClientInterface
 {
-    const API_HOST = '{{restApiHost}}';
-    const TEST_API_HOST = '{{testRestApiHost}}';
+    const API_HOST = 'api.cybersource.com';
+    const TEST_API_HOST = 'apitest.cybersource.com';
 
     const KEY_URL_PARAMS = 'url_params';
 
@@ -130,6 +130,13 @@ class Rest implements ClientInterface
 
         $query = '';
 
+        $log = [
+            'client' => static::class,
+            'endpoint' => $endpointUrl,
+            'method' => $requestMethod,
+            'request' => $payload,
+        ];
+
         if ($requestMethod == \Zend_Http_Client::GET) {
             $query = '?' . http_build_query($payload);
             $this->client->setParameterGet($payload);
@@ -150,13 +157,6 @@ class Rest implements ClientInterface
         );
 
         $this->client->setHeaders($signedHeaders);
-
-        $log = [
-            'client' => static::class,
-            'endpoint' => $endpointUrl,
-            'method' => $requestMethod,
-            'request' => $payload
-        ];
 
         $response = [];
 

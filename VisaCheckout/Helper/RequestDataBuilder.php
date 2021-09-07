@@ -16,12 +16,14 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
 
     /**
      * RequestDataBuilder constructor.
+     *
      * @param \Magento\Framework\App\Helper\Context $context
      * @param \Magento\Customer\Model\Session $customerSession
      * @param \Magento\Checkout\Model\Session $checkoutSession
      * @param CheckoutHelper $checkoutHelper
      * @param Config $gatewayConfig
      * @param \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $orderCollectionFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory
      * @param \Magento\Backend\Model\Auth $auth
      * @param \Magento\GiftMessage\Model\Message $giftMessage
      */
@@ -32,6 +34,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         CheckoutHelper $checkoutHelper,
         \Payments\VisaCheckout\Gateway\Config\Config $gatewayConfig,
         \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $orderCollectionFactory,
+        \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory,
         \Magento\Backend\Model\Auth $auth,
         \Magento\GiftMessage\Model\Message $giftMessage
     ) {
@@ -41,6 +44,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
             $checkoutSession,
             $checkoutHelper,
             $orderCollectionFactory,
+            $orderGridCollectionFactory,
             $auth,
             $giftMessage
         );

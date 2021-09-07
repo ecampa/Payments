@@ -76,13 +76,14 @@ class TokenHandler implements \Magento\Payment\Gateway\Response\HandlerInterface
         $cardType = $response['card']->cardType ?? '';
         $cardNumber = $payment->getAdditionalInformation('maskedPan');
         $ccLastFour = substr($cardNumber, -4);
-        $cardExpiry = $payment->getAdditionalInformation(\Payments\SecureAcceptance\Observer\DataAssignObserver::KEY_FLEX_EXP_DATE);
+        $cardExpiry = $payment->getAdditionalInformation(\Payments\SecureAcceptance\Observer\DataAssignObserver::KEY_EXP_DATE);
 
         $result = [
             'payment_token' => $this->paymentTokenManagement->getTokenFromPayment($payment),
             'card_type' => $cardType,
             'cc_last4' => $ccLastFour,
-            'card_expiry_date' => $cardExpiry
+            'card_expiry_date' => $cardExpiry,
+            'instrument_id' => $this->paymentTokenManagement->getInstrumentIdFromPayment($payment),
         ];
 
         if (preg_match('/^([0-9]{6}).+/', $cardNumber, $matches)) {

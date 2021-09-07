@@ -1,10 +1,7 @@
 <?php
 namespace Payments\BankTransfer\Model;
 
-use Payments\Core\Service\GatewaySoapApi;
 use Magento\Checkout\Model\Session;
-use Magento\Paypal\Model\Express\Checkout as ExpressCheckout;
-use Magento\Sales\Model\Order;
 use Magento\Framework\Exception\LocalizedException;
 
 /**
@@ -34,6 +31,7 @@ class Payment extends \Magento\Payment\Model\Method\AbstractMethod
      * @param \Magento\Payment\Helper\Data $paymentData
      * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
      * @param \Magento\Payment\Model\Method\Logger $logger
+     * @param array $gatewayAPI
      * @param \Magento\Framework\Model\ResourceModel\AbstractResource|null $resource
      * @param \Magento\Framework\Data\Collection\AbstractDb|null $resourceCollection
      * @param array $data
@@ -46,7 +44,7 @@ class Payment extends \Magento\Payment\Model\Method\AbstractMethod
         \Magento\Payment\Helper\Data $paymentData,
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
         \Magento\Payment\Model\Method\Logger $logger,
-        \Payments\Core\Service\GatewaySoapApi $gatewayApi,
+        array $gatewayAPI,
         Session $checkoutSession,
         \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
         \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
@@ -65,7 +63,7 @@ class Payment extends \Magento\Payment\Model\Method\AbstractMethod
             $data
         );
 
-        $this->_gatewayAPI = $gatewayApi;
+        $this->_gatewayAPI = $gatewayAPI;
         $this->_checkoutSession = $checkoutSession;
     }
 
@@ -96,16 +94,11 @@ class Payment extends \Magento\Payment\Model\Method\AbstractMethod
      */
     public function refund(\Magento\Payment\Model\InfoInterface $payment, $amount)
     {
-        $paymentMethod = $payment->getAdditionalInformation('payment_method');
-        $result = $this->_gatewayAPI->bankTransferRefund(
+        $paymentMethod = $payment->getAdditionalInformation('bank_payment_method');
+
+        $result = $this->_gatewayAPI[$paymentMethod]->bankTransferRefund(
             $payment->getOrder(),
-            $this->_scopeConfig->getValue(
-                "payment/payments_bank_transfer/".$paymentMethod."_merchant_id",
-                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
-            ),
-            $payment->getAdditionalInformation('merchantReferenceCode'),
-            $payment->getAdditionalInformation('requestID'),
-            $paymentMethod
+            $payment->getAdditionalInformation('request_id')
         );
         if (empty($result) || $result->reasonCode != 100) {
             throw new LocalizedException(__('Payment gateway refunding error.'));

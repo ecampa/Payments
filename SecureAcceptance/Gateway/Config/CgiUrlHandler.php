@@ -11,13 +11,20 @@ class CgiUrlHandler implements \Magento\Payment\Gateway\Config\ValueHandlerInter
     protected $config;
 
     /**
+     * @var false
+     */
+    private $isAdmin;
+
+    /**
      * CgiUrlHandler constructor.
      * @param \Payments\SecureAcceptance\Gateway\Config\Config $config
      */
     public function __construct(
-        \Payments\SecureAcceptance\Gateway\Config\Config $config
+        \Payments\SecureAcceptance\Gateway\Config\Config $config,
+        $isAdmin = false
     ) {
         $this->config = $config;
+        $this->isAdmin = $isAdmin;
     }
 
     /**
@@ -27,11 +34,15 @@ class CgiUrlHandler implements \Magento\Payment\Gateway\Config\ValueHandlerInter
     {
         $uri = '/pay';
 
+        if ($this->config->getUseIFrame()) {
+            $uri = '/embedded/pay';
+        }
+
         if ($this->config->isSilent()) {
             $uri = '/silent/pay';
         }
 
-        if (!$this->config->getIsLegacyMode()) {
+        if (!$this->config->getIsLegacyMode() && !$this->isAdmin) {
 
             $uri = '/token/create';
 

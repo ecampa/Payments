@@ -30,11 +30,13 @@ class GenerateKeyRequest implements BuilderInterface
      */
     public function build(array $buildSubject)
     {
-        $targetOrigin = $this->storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_WEB, true);
+        $storeFullUrl = $this->storeManager->getStore()->getBaseUrl(UrlInterface::URL_TYPE_WEB, true);
+
+        $urlComponents = parse_url($storeFullUrl);
 
         return [
             'encryptionType' => self::ENCRYPTION_TYPE,
-            'targetOrigin' => rtrim($targetOrigin, '\/'),
+            'targetOrigin' => $urlComponents['scheme'] . '://' . $urlComponents['host'],
         ];
     }
 }

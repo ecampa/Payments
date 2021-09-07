@@ -37,7 +37,7 @@ class ProcessorTransactionIdValidator extends \Magento\Payment\Gateway\Validator
             return $this->createResult(false, [__('Invalid CCA response')]);
         }
 
-        $payload = $response->getClaim('Payload', null);
+        $payload = $response->claims()->get('Payload');
 
         if (!$payload) {
             return $this->createResult(false, [__('Invalid CCA response')]);

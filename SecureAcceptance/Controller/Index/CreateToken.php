@@ -138,7 +138,8 @@ class CreateToken extends \Payments\Core\Action\CsrfIgnoringAction
                 'incrementId' => $response['req_reference_number'],
                 'type' => $this->helper->getCardType($response['req_card_type'], true),
                 'maskedCC' => "****-****-****-" . substr($response['req_card_number'], -4),
-                'expirationDate' => str_replace("-", "/", $response['req_card_expiry_date'])
+                'expirationDate' => str_replace("-", "/", $response['req_card_expiry_date']),
+                'merchantId' => $this->config->getMerchantId()
             ]));
 
             $paymentToken->setPublicHash($this->generatePublicHash($paymentToken));

@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <!-- Payment Method Facade configuration -->
+    <virtualType name="PaymentsWeChatPayGatewayFacade" type="Magento\Payment\Model\Method\Adapter">
+        <arguments>
+            <argument name="code" xsi:type="const">Payments\WeChatPay\Model\Ui\ConfigProvider::CODE</argument>
+            <argument name="formBlockType" xsi:type="string">Magento\Payment\Block\Form</argument>
+            <argument name="infoBlockType" xsi:type="string">Magento\Payment\Block\Info</argument>
+            <argument name="valueHandlerPool" xsi:type="object">PaymentsWeChatPayGatewayValueHandlerPool</argument>
+            <argument name="commandPool" xsi:type="object">PaymentsWeChatPayGatewayCommandPool</argument>
+            <argument name="validatorPool" xsi:type="object">PaymentsWeChatPayGatewayValidatorPool</argument>
+            <argument name="commandExecutor" xsi:type="object">PaymentsWeChatPayGatewayCommandManager</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Configuration reader -->
+    <type name="Payments\WeChatPay\Gateway\Config\Config">
+        <arguments>
+            <argument name="pathPattern" xsi:type="const">Magento\Payment\Gateway\Config\Config::DEFAULT_PATH_PATTERN</argument>
+            <argument name="methodCode" xsi:type="const">Payments\WeChatPay\Model\Ui\ConfigProvider::CODE</argument>
+        </arguments>
+    </type>
+
+    <!-- Commands infrastructure -->
+    <virtualType name="PaymentsWeChatPayGatewayCommandPool" type="Magento\Payment\Gateway\Command\CommandPool">
+        <arguments>
+            <argument name="commands" xsi:type="array">
+                <item name="capture" xsi:type="string">PaymentsWeChatPayGatewaySaleCommand</item>
+                <item name="refund" xsi:type="string">PaymentsWeChatPayGatewayRefundCommand</item>
+                <item name="status" xsi:type="string">PaymentsWeChatPayGatewayStatusCommand</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsWeChatPayGatewayCommandManager" type="Magento\Payment\Gateway\Command\CommandManager">
+        <arguments>
+            <argument name="commandPool" xsi:type="object">PaymentsWeChatPayGatewayCommandPool</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Magento\Payment\Gateway\Command\CommandManagerPool">
+        <arguments>
+            <argument name="executors" xsi:type="array">
+                <item name="payments_wechatpay" xsi:type="string">PaymentsWeChatPayGatewayCommandManager</item>
+            </argument>
+        </arguments>
+    </type>
+
+    <!-- Sale command -->
+    <virtualType name="PaymentsWeChatPayGatewaySaleCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsWeChatPayGatewaySaleRequestBuilderComposite</argument>
+            <argument name="handler" xsi:type="object">PaymentsWeChatPayGatewaySaleResponseHandlerChain</argument>
+            <argument name="validator" xsi:type="object">Payments\WeChatPay\Gateway\Validator\SaleResponseValidator</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\WeChatPay\Gateway\Http\TransferFactory</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+            <argument name="client" xsi:type="object">PaymentsWeChatPayGatewaySoapClient</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewaySaleRequestBuilderComposite" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="merchantData" xsi:type="string">PaymentsWeChatPayGatewayMerchantDataBuilder</item>
+                <item name="mrn" xsi:type="string">Payments\WeChatPay\Gateway\Request\OrderMrnBuilder</item>
+                <item name="apService" xsi:type="string">PaymentsWeChatPayGatewaySaleServiceBuilder</item>
+                <item name="apPaymentType" xsi:type="string">PaymentsWeChatPayGatewayPaymentTypeBuilder</item>
+                <item name="paymentData" xsi:type="string">Payments\WeChatPay\Gateway\Request\PaymentDataBuilder</item>
+                <item name="billTo" xsi:type="string">Payments\WeChatPay\Gateway\Request\BillToBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewaySaleServiceBuilder" type="Payments\WeChatPay\Gateway\Request\ServiceRunBuilder">
+        <arguments>
+            <argument name="serviceName" xsi:type="string">apSaleService</argument>
+            <argument name="builders" xsi:type="array">
+                <item name="saleServiceBuilder" xsi:type="string">Payments\WeChatPay\Gateway\Request\SaleServiceBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewayMerchantDataBuilder" type="Payments\WeChatPay\Gateway\Request\MerchantDataBuilder">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\WeChatPay\Gateway\Config\Config</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewayPaymentTypeBuilder" type="Payments\WeChatPay\Gateway\Request\PaymentTypeBuilder">
+        <arguments>
+            <argument name="paymentCode" xsi:type="string">WQR</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewaySaleResponseHandlerChain" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="transactionDetailsHandler" xsi:type="string">PaymentsWeChatPayGatewaySaleTransactionDetailsHandler</item>
+                <item name="saleResponseHandler" xsi:type="string">Payments\WeChatPay\Gateway\Response\SaleResponseHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewaySaleTransactionDetailsHandler" type="Payments\WeChatPay\Gateway\Response\TransactionDetailsHandler">
+        <arguments>
+            <argument name="replySectionName" xsi:type="string">apSaleReply</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Refund command -->
+    <virtualType name="PaymentsWeChatPayGatewayRefundCommand" type="PaymentsWeChatPayGatewaySaleCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsWeChatPayGatewayRefundRequestBuilderComposite</argument>
+            <argument name="handler" xsi:type="object">Payments\WeChatPay\Gateway\Response\RefundResponseHandler</argument>
+            <argument name="validator" xsi:type="object">Payments\WeChatPay\Gateway\Validator\ResponseCodeValidator</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewayRefundRequestBuilderComposite" type="PaymentsWeChatPayGatewaySaleRequestBuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="apService" xsi:type="string">PaymentsWeChatPayGatewayRefundServiceBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewayRefundServiceBuilder" type="Payments\WeChatPay\Gateway\Request\ServiceRunBuilder">
+        <arguments>
+            <argument name="serviceName" xsi:type="string">apRefundService</argument>
+            <argument name="builders" xsi:type="array">
+                <item name="parentTransactionIdBuilder" xsi:type="string">PaymentsWeChatPayGatewayRefundParentTransactionIdBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewayRefundParentTransactionIdBuilder" type="Payments\WeChatPay\Gateway\Request\ParentTransactionIdBuilder">
+        <arguments>
+            <argument name="parentTransactionIdFieldName" xsi:type="string">refundRequestID</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Status command -->
+    <virtualType name="PaymentsWeChatPayGatewayStatusCommand" type="PaymentsWeChatPayGatewaySaleCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsWeChatPayGatewayStatusRequestBuilderComposite</argument>
+            <argument name="handler" xsi:type="object">Payments\WeChatPay\Gateway\Response\StatusResponseHandler</argument>
+            <argument name="validator" xsi:type="object">Payments\WeChatPay\Gateway\Validator\ResponseCodeValidator</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewayStatusRequestBuilderComposite" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="merchantData" xsi:type="string">PaymentsWeChatPayGatewayMerchantDataBuilder</item>
+                <item name="mrn" xsi:type="string">Payments\WeChatPay\Gateway\Request\OrderMrnBuilder</item>
+                <item name="apService" xsi:type="string">PaymentsWeChatPayGatewayStatusServiceBuilder</item>
+                <item name="apPaymentType" xsi:type="string">PaymentsWeChatPayGatewayPaymentTypeBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewayStatusServiceBuilder" type="Payments\WeChatPay\Gateway\Request\ServiceRunBuilder">
+        <arguments>
+            <argument name="serviceName" xsi:type="string">apCheckStatusService</argument>
+            <argument name="builders" xsi:type="array">
+                <item name="transactionIdBuilder" xsi:type="string">PaymentsWeChatPayGatewayStatusTransactionIdBuilder</item>
+                <item name="testResponseCodeBuilder" xsi:type="string">Payments\WeChatPay\Gateway\Request\TestResponseCodeBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewayStatusTransactionIdBuilder" type="Payments\WeChatPay\Gateway\Request\TransactionIdBuilder">
+        <arguments>
+            <argument name="transactionIdFieldName" xsi:type="string">checkStatusRequestID</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Value handlers infrastructure -->
+    <virtualType name="PaymentsWeChatPayGatewayValueHandlerPool" type="Magento\Payment\Gateway\Config\ValueHandlerPool">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="default" xsi:type="string">PaymentsWeChatPayGatewayConfigValueHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewayConfigValueHandler" type="Magento\Payment\Gateway\Config\ConfigValueHandler">
+        <arguments>
+            <argument name="configInterface" xsi:type="object">Payments\WeChatPay\Gateway\Config\Config</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Validator pool -->
+    <virtualType name="PaymentsWeChatPayGatewayValidatorPool" type="Magento\Payment\Gateway\Validator\ValidatorPool">
+        <arguments>
+            <argument name="validators" xsi:type="array">
+                <item name="currency" xsi:type="string">Payments\WeChatPay\Gateway\Validator\CurrencyValidator</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Cron processor -->
+    <virtualType name="PaymentsWeChatPayPendingPaymentProcessor" type="Payments\Core\Cron\PaymentProcessor">
+        <arguments>
+            <argument name="config" xsi:type="object">Payments\WeChatPay\Gateway\Config\Config</argument>
+            <argument name="commandCode" xsi:type="string">status</argument>
+            <argument name="paymentCode" xsi:type="const">Payments\WeChatPay\Model\Ui\ConfigProvider::CODE</argument>
+            <argument name="paymentStates" xsi:type="array">
+                <item name="paymentReview" xsi:type="const">Magento\Sales\Model\Order::STATE_PAYMENT_REVIEW</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <!-- WeChat Pay logger configuration -->
+    <virtualType name="PaymentsWeChatPayGatewayLog" type="Payments\Core\Model\Logger">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="payments" xsi:type="object">PaymentsWeChatPayGatewayLogHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewayLogHandler" type="Magento\Framework\Logger\Handler\Base">
+        <arguments>
+            <argument name="fileName" xsi:type="string">/var/log/payments.wcp.log</argument>
+        </arguments>
+    </virtualType>
+    <virtualType name="PaymentsWeChatPayGatewaySoapClient" type="Payments\WeChatPay\Service\Soap">
+        <arguments>
+            <argument name="logger" xsi:type="object">PaymentsWeChatPayGatewayLog</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\WeChatPay\Controller\Payment\CheckStatus">
+        <arguments>
+            <argument name="logger" xsi:type="object">PaymentsWeChatPayGatewayLog</argument>
+            <argument name="commandManager" xsi:type="object">PaymentsWeChatPayGatewayCommandManager</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\WeChatPay\Controller\Payment\GetQrData">
+        <arguments>
+            <argument name="logger" xsi:type="object">PaymentsWeChatPayGatewayLog</argument>
+        </arguments>
+    </type>
+
+    <type name="Magento\Sales\Model\Order\Invoice">
+        <plugin name="wechatpay-sales-order-invoice-plugin" type="Payments\WeChatPay\Plugin\SalesOrderInvoicePlugin"/>
+    </type>
+
+</config>

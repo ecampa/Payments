@@ -97,19 +97,12 @@ class TokenRequest extends \Magento\Framework\App\Action\Action
 
             $commandResult = $commandResult->get();
 
-            $publicKey = $commandResult['der']['publicKey'] ?? null;
-
-            if (!$publicKey) {
-                throw new \Magento\Framework\Exception\LocalizedException(__('Failed to get Flex Microform keys. Please verify your extension configuration.'));
-            }
-
-            $quote->getPayment()->setAdditionalInformation('microformPublicKey', $publicKey);
             $this->quoteRepository->save($quote);
 
             $result->setData(
                 [
                     'success' => true,
-                    'token' => $commandResult['jwk']
+                    'token' => $commandResult['keyId'],
                 ]
             );
 

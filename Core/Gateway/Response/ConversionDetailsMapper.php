@@ -20,7 +20,8 @@ class ConversionDetailsMapper implements \Payments\Core\Gateway\Response\MapperI
         $result = [];
 
         foreach ($response[static::KEY_CONVERSION_DETAILS] as $conversion) {
-            $result[(string)$conversion[static::KEY_MRN]] = [
+            $result[] = [
+                'order_increment_id' => (string)$conversion[static::KEY_MRN],
                 'decision' => (string)$conversion[static::KEY_DECISION],
                 'new_decision' => (string)$conversion[static::KEY_NEW_DECISION],
                 'transaction_id' => (string)$conversion[static::KEY_REQUEST_ID],

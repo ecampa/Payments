@@ -26,17 +26,24 @@ class TokenBuilder implements \Payments\ThreeDSecure\Gateway\Request\Jwt\TokenBu
      */
     private $builderFactory;
 
+    /**
+     * @var \DateTimeImmutableFactory
+     */
+    private $dateTimeImmutableFactory;
+
     public function __construct(
         \Lcobucci\JWT\Signer\Hmac\Sha256 $sha256,
         \Magento\Framework\Math\Random $random,
         \Lcobucci\JWT\Signer\KeyFactory $keyFactory,
-        \Lcobucci\JWT\BuilderFactory $builderFactory
+        \Lcobucci\JWT\BuilderFactory $builderFactory,
+        \DateTimeImmutableFactory $dateTimeImmutableFactory
     ) {
 
         $this->sha256 = $sha256;
         $this->random = $random;
         $this->keyFactory = $keyFactory;
         $this->builderFactory = $builderFactory;
+        $this->dateTimeImmutableFactory = $dateTimeImmutableFactory;
     }
 
     public function buildToken($referenceId, $payload, $orgUnitId, $apiId, $apiKey)
@@ -48,20 +55,21 @@ class TokenBuilder implements \Payments\ThreeDSecure\Gateway\Request\Jwt\TokenBu
         $currentTime = $this->getTime();
 
         $jwt = $tokenBuilder
-            ->identifiedBy($jwtId, true)
+            ->identifiedBy($jwtId)
             ->issuedBy($apiId)
-            ->issuedAt($currentTime)
-            ->expiresAt($currentTime + self::JWT_LIFETIME)
+            ->issuedAt($this->dateTimeImmutableFactory->create()->setTimestamp($currentTime))
+            ->expiresAt($this->dateTimeImmutableFactory->create()->setTimestamp($currentTime + self::JWT_LIFETIME))
             ->withClaim('OrgUnitId', $orgUnitId)
             ->withClaim('ReferenceId', $referenceId)
             ->withClaim('Payload', $payload)
             ->withClaim('ObjectifyPayload', true)
             ->getToken($this->sha256, $this->keyFactory->create(['content' => $apiKey]));
 
-        return $jwt->__toString();
+        return $jwt->toString();
     }
 
     protected function getTime()
     {
-        return time();     }
+        return time(); 
+    }
 }

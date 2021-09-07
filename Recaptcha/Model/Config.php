@@ -2,6 +2,8 @@
 
 namespace Payments\Recaptcha\Model;
 
+use Magento\Store\Model\ScopeInterface;
+
 class Config
 {
 
@@ -26,32 +28,50 @@ class Config
 
     public function isEnabled()
     {
-        return (bool)$this->scopeConfig->getValue(static::XML_PATH_RECAPTCHA_ENABLED);
+        return (bool)$this->scopeConfig->getValue(
+            static::XML_PATH_RECAPTCHA_ENABLED,
+            ScopeInterface::SCOPE_STORE
+        );
     }
 
     public function getPublicKey()
     {
-        return $this->scopeConfig->getValue(static::XML_PATH_RECAPTCHA_PUBLIC_KEY);
+        return $this->scopeConfig->getValue(
+            static::XML_PATH_RECAPTCHA_PUBLIC_KEY,
+            ScopeInterface::SCOPE_STORE
+);
     }
 
     public function getType()
     {
-        return $this->scopeConfig->getValue(static::XML_PATH_RECAPTCHA_TYPE);
+        return $this->scopeConfig->getValue(
+            static::XML_PATH_RECAPTCHA_TYPE,
+            ScopeInterface::SCOPE_STORE
+        );
     }
 
     public function getPrivateKey()
     {
-        return $this->scopeConfig->getValue(static::XML_PATH_RECAPTCHA_PRIVATE_KEY);
+        return $this->scopeConfig->getValue(
+            static::XML_PATH_RECAPTCHA_PRIVATE_KEY,
+            ScopeInterface::SCOPE_STORE
+        );
     }
 
     public function getPosition()
     {
-        return $this->scopeConfig->getValue(static::XML_PATH_RECAPTCHA_POSITION);
+        return $this->scopeConfig->getValue(
+            static::XML_PATH_RECAPTCHA_POSITION,
+            ScopeInterface::SCOPE_STORE
+        );
     }
 
     public function getLanguageCode()
     {
-        return $this->scopeConfig->getValue(static::XML_PATH_RECAPTCHA_LANGUAGE);
+        return $this->scopeConfig->getValue(
+            static::XML_PATH_RECAPTCHA_LANGUAGE,
+            ScopeInterface::SCOPE_STORE
+        );
     }
 
 }

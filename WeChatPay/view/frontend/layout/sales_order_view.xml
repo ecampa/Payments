@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="content">
+            <block name="wechatpay.qr.popup" class="Payments\WeChatPay\Block\Order\Info\Qr" template="Payments_WeChatPay::order/info/popup.phtml"/>
+        </referenceContainer>
+        <referenceBlock name="sales.order.info.buttons">
+            <block name="order.buttons.wechatpay.qr" class="Payments\WeChatPay\Block\Order\Info\Qr" template="Payments_WeChatPay::order/info/buttons/qr.phtml" after="-"/>
+        </referenceBlock>
+    </body>
+</page>

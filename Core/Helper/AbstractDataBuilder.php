@@ -9,7 +9,7 @@ use Magento\GiftMessage\Model\Message as GiftMessage;
 
 abstract class AbstractDataBuilder extends AbstractHelper
 {
-    const PARTNER_SOLUTION_ID = '03AASPFT';
+    const PARTNER_SOLUTION_ID = 'NK2IE7JE';
     const CC_CAPTURE_SERVICE_TOTAL_COUNT = 99;
 
     /**
@@ -67,13 +67,19 @@ abstract class AbstractDataBuilder extends AbstractHelper
     ];
 
     /**
+     * @var \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory
+     */
+    private $orderGridCollectionFactory;
+
+    /**
      * AbstractDataBuilder constructor.
      *
      * @param \Magento\Framework\App\Helper\Context $context
      * @param \Magento\Customer\Model\Session $customerSession
-     * @param \Magento\Checkout\Model\Session $checkoutSession
+     * @param \Magento\Framework\Session\SessionManagerInterface $checkoutSession
      * @param \Magento\Checkout\Helper\Data $data
      * @param OrderCollectionFactory $orderCollectionFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory
      * @param \Magento\Backend\Model\Auth $auth
      * @param GiftMessage $giftMessage
      */
@@ -83,6 +89,7 @@ abstract class AbstractDataBuilder extends AbstractHelper
         \Magento\Framework\Session\SessionManagerInterface $checkoutSession,
         \Magento\Checkout\Helper\Data $data,
         OrderCollectionFactory $orderCollectionFactory,
+        \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory,
         \Magento\Backend\Model\Auth $auth,
         GiftMessage $giftMessage
     ) {
@@ -91,6 +98,7 @@ abstract class AbstractDataBuilder extends AbstractHelper
         $this->customerSession = $customerSession;
         $this->checkoutHelper  = $data;
         $this->orderCollectionFactory = $orderCollectionFactory;
+        $this->orderGridCollectionFactory = $orderGridCollectionFactory;
         $this->auth = $auth;
         $this->giftMessage = $giftMessage;
         $this->urlBuilder = $context->getUrlBuilder();
@@ -116,7 +124,7 @@ abstract class AbstractDataBuilder extends AbstractHelper
         if (!is_float($amount)) {
             $amount = (float) $amount;
         }
-        
+
         return number_format($amount, 2, '.', '');
     }
 
@@ -181,8 +189,10 @@ abstract class AbstractDataBuilder extends AbstractHelper
             $merchantDefinedData->field5 = round((time() - strtotime($this->customerSession->getCustomerData()->getCreatedAt())) / (3600 * 24));// Member Account Age (Days)
         }
 
-        $orders = $this->orderCollectionFactory->create()
-            ->addFieldToFilter('customer_email', $quote->getCustomerEmail());
+        $orders = $this->orderGridCollectionFactory->create()
+            ->addFieldToFilter('customer_email', $quote->getCustomerEmail())
+        ;
+        $orders->getSelect()->limit(1);
 
         $merchantDefinedData->field6 = (int)(count($orders) > 0); // Repeat Customer
         $merchantDefinedData->field20 = $quote->getCouponCode(); //Coupon Code

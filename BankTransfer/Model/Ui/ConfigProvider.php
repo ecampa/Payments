@@ -58,18 +58,6 @@ class ConfigProvider implements ConfigProviderInterface
                     'placeOrderUrl' => $this->url->getUrl('paymentsbt/index/pay'),
                     'bankCode' => 'bancontact',
                 ],
-                'payments_bank_transfer_eps' => [
-                    'active' => $this->config->isMethodActive('eps'),
-                    'title' => $this->config->getMethodTitle('eps'),
-                    'placeOrderUrl' => $this->url->getUrl('paymentsbt/index/pay'),
-                    'bankCode' => 'eps',
-                ],
-                'payments_bank_transfer_giro' => [
-                    'active' => $this->config->isMethodActive('giro'),
-                    'title' => $this->config->getMethodTitle('giro'),
-                    'placeOrderUrl' => $this->url->getUrl('paymentsbt/index/pay'),
-                    'bankCode' => 'giro',
-                ],
             ]
         ];
     }

@@ -31,7 +31,7 @@ define(
 
         return Component.extend({
             defaults: {
-                active: false,
+                active: ko.observable(false),
                 template: 'Payments_KlarnaFinancial/payment/form',
                 code: 'payments_klarna',
                 grandTotalAmount: null,
@@ -42,7 +42,7 @@ define(
                     onActiveChange: 'active'
                 }
             },
-
+            initialized: ko.observable(false),
             initObservable: function () {
                 var self = this;
                 this._super()
@@ -50,26 +50,37 @@ define(
                 this.grandTotalAmount = quote.totals()['base_grand_total'];
                 this.currencyCode = quote.totals()['base_currency_code'];
 
+                if (this.isActive() && !this.initialized) {
+                    this.initKlarna();
+                }
+
                 quote.totals.subscribe(function () {
+
+                    if (!self.isActive()) {
+                        return;
+                    }
+
+                    var changeMade = false;
+
                     if (self.grandTotalAmount !== quote.totals()['base_grand_total']) {
                         self.grandTotalAmount = quote.totals()['base_grand_total'];
+                        changeMade = true;
                     }
 
                     if (self.currencyCode !== quote.totals()['base_currency_code']) {
                         self.currencyCode = quote.totals()['base_currency_code'];
+                        changeMade = true;
+                    }
+
+                    if (self.isActive() && changeMade) {
+                        self.initKlarna();
                     }
                 });
 
-                quote.totals.subscribe(this.updateSession.bind(this));
-
-               
-               
-               
-
                 return this;
             },
-            updateSession: function (value) {
-                return $.ajax({
+            updateSession: function () {
+                $.ajax({
                     method: 'POST',
                     url: urlBuilder.build("paymentsklarna/index/session"),
                     data: {
@@ -77,15 +88,14 @@ define(
                         'guestEmail': quote.guestEmail,
                         'updateToken': true
                     }
-                })
+                });
             },
             onActiveChange: function (isActive) {
-                if (!isActive) {
-                    return;
-                }
 
-                fullScreenLoader.startLoader();
-                this.initKlarna();
+                if (isActive && !this.initialized()) {
+                    this.initKlarna();
+                }
+                return;
             },
             getCode: function () {
                 return this.code;
@@ -125,7 +135,7 @@ define(
                 this.isPlaceOrderActionAllowed(false);
                 fullScreenLoader.startLoader();
 
-                setBillingAddress().then(this.updateSession).then(function () {
+                setBillingAddress().then(this.updateSession()).then(function () {
                     Klarna.Credit.authorize(
                         {},
                         function (response) {
@@ -134,7 +144,6 @@ define(
                                 fullScreenLoader.stopLoader();
                                 return;
                             }
-
                             var form = $(document.createElement('form'));
                             $(form).attr("action", that.getPlaceOrderUrl());
                             $(form).attr("method", "POST");
@@ -145,6 +154,7 @@ define(
                             $(form).append('<input name="agreementId" value="' + $("#payments_klarna").parent().parent().children('.payment-method-content').children(".checkout-agreements-block").children().children().children().children().val() + '"/>');
                             $("body").append(form);
                             $(form).submit();
+                            customerData.invalidate(['cart']);
                         }
                     );
                 });
@@ -152,13 +162,20 @@ define(
 
             initKlarna: function () {
                 var self = this;
+
+                fullScreenLoader.startLoader();
+
+                var sessionData = {
+                    'form_key': $.cookie('form_key'),
+                    'guestEmail': quote.guestEmail
+                };
+
+
                 $.ajax({
                     method: 'GET',
                     url: urlBuilder.build("paymentsklarna/index/session"),
-                    data: {
-                        'guestEmail': quote.guestEmail
-                    }
-                }).done(function (data){
+                    data: sessionData
+                }).done(function (data) {
                     var processorToken = data.processorToken;
 
                     if (processorToken === "" || processorToken === null) {
@@ -175,22 +192,22 @@ define(
                     }
 
                     try {
-
                         Klarna.Credit.init({client_token: processorToken});
-
                         Klarna.Credit.load(
                             {
                                 container: "#klarna_container"
                             },
                             function (res) {
                                 fullScreenLoader.stopLoader();
-                                if (res['show_form']) {
-                                    $('#klarna_container').show();
-                                    self.isPlaceOrderActionAllowed(true);
+
+                                if (!res['show_form']) {
+                                    self.showInitErrorMessage({message: $.mage.__('Klarna is not available as a payment option.')});
+                                    self.isPlaceOrderActionAllowed(false);
                                     return;
                                 }
-                                self.showInitErrorMessage({message: $.mage.__('Klarna is not available as a payment option.')});
-                                self.isPlaceOrderActionAllowed(false);
+                                $('#klarna_container').show();
+                                self.isPlaceOrderActionAllowed(true);
+                                self.initialized(true);
                             }
                         );
                     }

@@ -6,6 +6,7 @@ class Config extends \Magento\Tax\Model\Config
 {
     const TAX_ENABLED = 'tax/paymentstax/tax_enabled';
     const TAX_COUNTRIES = 'tax/paymentstax/tax_countries';
+    const CUSTOMER_TAX_CLASS_EXCLUDE = 'tax/paymentstax/customer_tax_class_exclude';
     const TAX_SHIP_FROM_CITY = 'tax/paymentstax/ship_from_city';
     const TAX_SHIP_FROM_POSTCODE = 'tax/paymentstax/ship_from_postcode';
     const TAX_SHIP_FROM_COUNTRY = 'tax/paymentstax/ship_from_country';
@@ -159,11 +160,12 @@ class Config extends \Magento\Tax\Model\Config
         );
     }
 
-    public function isTaxEnabled()
+    public function isTaxEnabled($storeId = null)
     {
         return (bool) $this->_scopeConfig->getValue(
             self::TAX_ENABLED,
-            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
+            $storeId
         );
     }
 
@@ -172,6 +174,15 @@ class Config extends \Magento\Tax\Model\Config
         return $this->_scopeConfig->getValue(
             self::TAX_COUNTRIES,
             \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+        );
+    }
+
+    public function getCustomerTaxClassExclude($storeId = null)
+    {
+        return $this->_scopeConfig->getValue(
+            self::CUSTOMER_TAX_CLASS_EXCLUDE,
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
+            $storeId
         );
     }
 }

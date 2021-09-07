@@ -25,7 +25,9 @@ class Status
      */
     protected $_scopeConfig;
 
-    protected $gatewayApi;
+    /** @var array
+     */
+    protected $gatewayAPI;
 
     /**
      * @var \Magento\Framework\HTTP\Client\Curl
@@ -69,6 +71,7 @@ class Status
      * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
      * @param \Magento\Sales\Model\ResourceModel\Order\Payment\CollectionFactory $paymentCollectionFactory
      * @param \Magento\Framework\HTTP\Client\Curl $curl
+     * @param array $gatewayAPI
      * @param \Magento\Sales\Api\OrderRepositoryInterface $orderRepository
      * @param \Magento\Sales\Model\Service\InvoiceService $invoiceService
      * @param \Magento\Store\Model\StoreManagerInterface $storeManager
@@ -82,7 +85,7 @@ class Status
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
         \Magento\Sales\Model\ResourceModel\Order\Payment\CollectionFactory $paymentCollectionFactory,
         \Magento\Framework\HTTP\Client\Curl $curl,
-        \Payments\Core\Service\GatewaySoapApi $gatewayApi,
+        array $gatewayAPI,
         \Magento\Sales\Api\OrderRepositoryInterface $orderRepository,
         \Magento\Sales\Model\Service\InvoiceService $invoiceService,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
@@ -95,7 +98,7 @@ class Status
         $this->paymentCollectionFactory = $paymentCollectionFactory;
         $this->_scopeConfig = $scopeConfig;
         $this->curl = $curl;
-        $this->gatewayApi = $gatewayApi;
+        $this->gatewayAPI = $gatewayAPI;
         $this->orderRepository = $orderRepository;
         $this->_storeManager = $storeManager;
         $this->_transportBuilder = $transportBuilder;
@@ -118,14 +121,13 @@ class Status
                     ['status', 'quote_id']
                 )->order('entity_id DESC');
                 $paymentCollection->load();
+
                 foreach ($paymentCollection as $payment) {
                     if (!empty($payment->getData('last_trans_id'))) {
                         $paymentMethod = $payment->getAdditionalInformation('bank_payment_method');
-                        $result = $this->gatewayApi->checkBankTransferStatus(
-                            $this->_scopeConfig->getValue("payment/payments_bank_transfer/".$paymentMethod."_merchant_id", \Magento\Store\Model\ScopeInterface::SCOPE_STORE),
+                        $result = $this->gatewayAPI[$paymentMethod]->checkBankTransferStatus(
                             $payment->getOrder()->getIncrementId(),
-                            $payment->getData('last_trans_id'),
-                            $paymentMethod
+                            $payment->getData('last_trans_id')
                         );
                         $this->updateOrder($result, $payment->getOrder());
                     }

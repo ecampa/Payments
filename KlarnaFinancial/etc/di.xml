@@ -37,7 +37,7 @@
 
     <virtualType name="KlarnaPaymentCommandManager" type="Magento\Payment\Gateway\Command\CommandManager">
         <arguments>
-            <argument name="commandPool" xsi:type="object">KlarnaPaymentGatewayCommandPool</argument>
+            <argument name="commandPool" xsi:type="object">PaymentsKlarnaPaymentGatewayCommandPool</argument>
         </arguments>
     </virtualType>
 

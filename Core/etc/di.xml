@@ -5,6 +5,8 @@
 
     <preference for="Payments\Core\Model\Checkout\PaymentFailureRouteProviderInterface" type="Payments\Core\Model\Checkout\PaymentFailureRouteProvider"/>
 
+    <preference for="Payments\Core\Service\OrderToQuoteInterface" type="Payments\Core\Service\OrderToQuoteService"/>
+
     <type name="Payments\Core\Model\LoggerInterface">
         <plugin name="paymentsLoggerCensorPlugin" type="\Payments\Core\Plugin\LoggerCensorPlugin"/>
     </type>
@@ -131,6 +133,273 @@
             <argument name="contentType" xsi:type="string">*/*</argument>
         </arguments>
     </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestBaseCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="transferFactory" xsi:type="object">Payments\Core\Gateway\Http\TransferFactory</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestAuthorizeCommand" type="PaymentsCoreGatewayRestBaseCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsCoreGatewayRestAuthorizationRequest</argument>
+            <argument name="handler" xsi:type="object">PaymentsCoreGatewayRestAuthorizationHandler</argument>
+            <argument name="validator" xsi:type="object">PaymentsCoreGatewayValidatorRestCreateResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">PaymentsCoreGatewayRestPaymentsClient</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestAuthorizationRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="partnerInformationBuilder" xsi:type="string">Payments\Core\Gateway\Request\Rest\PartnerInformationBuilder</item>
+                <item name="orderItemsInformation" xsi:type="string">PaymentsCoreGatewayRestAuthorizationItemsDataBuilder</item>
+                <item name="paymentInformation" xsi:type="string">Payments\Core\Gateway\Request\Rest\PaymentDataBuilder</item>
+                <item name="addressInformation" xsi:type="string">Payments\Core\Gateway\Request\Rest\AddressDataBuilder</item>
+                <item name="deviceFingerprint" xsi:type="string">Payments\Core\Gateway\Request\Rest\DeviceFingerprintBuilder</item>
+                <item name="mddInformation" xsi:type="string">Payments\Core\Gateway\Request\Rest\DecisionManagerMddBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestAuthorizationItemsDataBuilder" type="Payments\Core\Gateway\Request\Rest\OrderItemsBuilder">
+        <arguments>
+            <argument name="objectName" xsi:type="string">order</argument>
+            <argument name="filter" xsi:type="object">PaymentsCoreGatewayStringProductNameFilter</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestPaymentsClient" type="Payments\Core\Gateway\Http\Client\Rest">
+        <arguments>
+            <argument name="requestMethod" xsi:type="const">Magento\Framework\HTTP\ZendClient::POST</argument>
+            <argument name="requestPath" xsi:type="string">/pts/v2/payments</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayValidatorRestCreateResponseCodeValidator" type="Payments\Core\Gateway\Validator\RestResponseCodeValidator">
+        <arguments>
+            <argument name="validResponseCode" xsi:type="const">Payments\Core\Gateway\Validator\RestResponseCodeValidator::RESPONSE_CODE_CREATED</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestAuthorizationHandler" type="Magento\Payment\Gateway\Response\HandlerChain">
+        <arguments>
+            <argument name="handlers" xsi:type="array">
+                <item name="transactionDetails" xsi:type="string">PaymentsCoreGatewayRestAuthorizationTransactionDetailsHandler</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestAuthorizationTransactionDetailsHandler" type="Payments\Core\Gateway\Response\Rest\TransactionDetailsHandler">
+        <arguments>
+            <argument name="shouldCloseTransaction" xsi:type="boolean">false</argument>
+            <argument name="shouldCloseParentTransaction" xsi:type="boolean">false</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestVoidTransactionDetailsHandler" type="Payments\Core\Gateway\Response\Rest\TransactionDetailsHandler">
+        <arguments>
+            <argument name="shouldCloseTransaction" xsi:type="boolean">true</argument>
+            <argument name="shouldCloseParentTransaction" xsi:type="boolean">true</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestSettlementCommand" type="PaymentsCoreGatewayRestBaseCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsCoreGatewayRestSettlementRequest</argument>
+            <argument name="validator" xsi:type="object">PaymentsCoreGatewayValidatorRestCreateResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">PaymentsCoreGatewayRestPaymentsClient</argument>
+            <argument name="handler" xsi:type="object">Payments\Core\Gateway\Response\Rest\CaptureResponseHandler</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestSettlementRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="partnerInformationBuilder" xsi:type="string">Payments\Core\Gateway\Request\Rest\PartnerInformationBuilder</item>
+                <item name="orderItemsInformation" xsi:type="string">PaymentsCoreGatewayRestAuthorizationItemsDataBuilder</item>
+                <item name="paymentInformation" xsi:type="string">Payments\Core\Gateway\Request\Rest\PaymentDataBuilder</item>
+                <item name="captureId" xsi:type="string">PaymentsCoreGatewayRestCapturesUriBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestCapturesUriBuilder" type="Payments\Core\Gateway\Request\Rest\OperationBuilder">
+        <arguments>
+            <argument name="operationName" xsi:type="string">captures</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRefundCommand" type="PaymentsCoreGatewayRestBaseCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsCoreGatewayRestRefundRequest</argument>
+            <argument name="client" xsi:type="object">PaymentsCoreGatewayRestPaymentsClient</argument>
+            <argument name="handler" xsi:type="object">Payments\Core\Gateway\Response\Rest\RefundResponseHandler</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestRefundRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="partnerInformationBuilder" xsi:type="string">Payments\Core\Gateway\Request\Rest\PartnerInformationBuilder</item>
+                <item name="orderItemsInformation" xsi:type="string">PaymentsCoreGatewayRestAuthorizationItemsDataBuilder</item>
+                <item name="paymentInformation" xsi:type="string">Payments\Core\Gateway\Request\Rest\PaymentDataBuilder</item>
+                <item name="refundId" xsi:type="string">PaymentsCoreGatewayRestRefundsUriBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestRefundsUriBuilder" type="Payments\Core\Gateway\Request\Rest\OperationBuilder">
+        <arguments>
+            <argument name="operationName" xsi:type="string">refunds</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayVoidCommand" type="PaymentsCoreGatewayRestBaseCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsCoreGatewayRestVoidRequest</argument>
+            <argument name="client" xsi:type="object">PaymentsCoreGatewayRestPaymentsClient</argument>
+            <argument name="handler" xsi:type="object">PaymentsCoreGatewayRestVoidTransactionDetailsHandler</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestVoidRequest" type="Magento\Payment\Gateway\Request\BuilderComposite">
+        <arguments>
+            <argument name="builders" xsi:type="array">
+                <item name="partnerInformationBuilder" xsi:type="string">Payments\Core\Gateway\Request\Rest\PartnerInformationBuilder</item>
+                <item name="orderItemsInformation" xsi:type="string">PaymentsCoreGatewayRestAuthorizationItemsDataBuilder</item>
+                <item name="paymentInformation" xsi:type="string">Payments\Core\Gateway\Request\Rest\PaymentDataBuilder</item>
+                <item name="voidId" xsi:type="string">PaymentsCoreGatewayRestVoidsUriBuilder</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayRestVoidsUriBuilder" type="Payments\Core\Gateway\Request\Rest\OperationBuilder">
+        <arguments>
+            <argument name="operationName" xsi:type="string">voids</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayStringProductNameFilter" type="Payments\Core\StringUtils\FilterChain">
+        <arguments>
+            <argument name="filters" xsi:type="array">
+                <item name="alphanumFilter" xsi:type="string">Payments\Core\StringUtils\AlphaNumFilter</item>
+                <item name="maxLengthFilter" xsi:type="string">Payments\Core\StringUtils\MaxLengthFilter</item>
+                <item name="trimFilter" xsi:type="string">Payments\Core\StringUtils\TrimFilter</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayString255Filter" type="Payments\Core\StringUtils\MaxLengthFilter">
+        <arguments>
+            <argument name="maxLength" xsi:type="number">255</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayString100Filter" type="Payments\Core\StringUtils\MaxLengthFilter">
+        <arguments>
+            <argument name="maxLength" xsi:type="number">100</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayString60Filter" type="Payments\Core\StringUtils\MaxLengthFilter">
+        <arguments>
+            <argument name="maxLength" xsi:type="number">60</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayString50Filter" type="Payments\Core\StringUtils\MaxLengthFilter">
+        <arguments>
+            <argument name="maxLength" xsi:type="number">50</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayString15Filter" type="Payments\Core\StringUtils\MaxLengthFilter">
+        <arguments>
+            <argument name="maxLength" xsi:type="number">15</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayString10Filter" type="Payments\Core\StringUtils\MaxLengthFilter">
+        <arguments>
+            <argument name="maxLength" xsi:type="number">10</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayAlphaNumString60Filter" type="Payments\Core\StringUtils\FilterChain">
+        <arguments>
+            <argument name="filters" xsi:type="array">
+                <item name="alphaNumFilter" xsi:type="string">Payments\Core\StringUtils\AlphaNumFilter</item>
+                <item name="maxLengthFilter" xsi:type="string">Payments\Core\StringUtils\MaxLengthFilter</item>
+                <item name="trimFilter" xsi:type="string">Payments\Core\StringUtils\TrimFilter</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewayStringFilterPool" type="Payments\Core\StringUtils\FilterPool">
+        <arguments>
+            <argument name="filters" xsi:type="array">
+                <item name="string255" xsi:type="string">PaymentsCoreGatewayString255Filter</item>
+                <item name="string100" xsi:type="string">PaymentsCoreGatewayString100Filter</item>
+                <item name="string60" xsi:type="string">PaymentsCoreGatewayString60Filter</item>
+                <item name="string50" xsi:type="string">PaymentsCoreGatewayString50Filter</item>
+                <item name="string15" xsi:type="string">PaymentsCoreGatewayString15Filter</item>
+                <item name="string10" xsi:type="string">PaymentsCoreGatewayString10Filter</item>
+                <item name="alphanumstring60" xsi:type="string">PaymentsCoreGatewayAlphaNumString60Filter</item>
+                <item name="productName" xsi:type="string">PaymentsCoreGatewayStringProductNameFilter</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <preference for="Payments\Core\StringUtils\FilterPoolInterface" type="PaymentsCoreGatewayStringFilterPool"/>
+
+    <virtualType name="PaymentsCoreGatewayStringFilterRulePool" type="Payments\Core\StringUtils\RulePool">
+        <arguments>
+            <argument name="rules" xsi:type="array">
+                <!-- SOAP fields -->
+                <item name="firstName" xsi:type="string">string60</item>
+                <item name="lastName" xsi:type="string">string60</item>
+                <item name="company" xsi:type="string">alphanumstring60</item>
+                <item name="phoneNumber" xsi:type="string">string15</item>
+                <item name="postalCode" xsi:type="string">string10</item>
+                <item name="street1" xsi:type="string">string60</item>
+                <item name="street2" xsi:type="string">string60</item>
+                <item name="city" xsi:type="string">string50</item>
+                <item name="productName" xsi:type="string">productName</item>
+                <!-- REST fields -->
+                <item name="name" xsi:type="string">productName</item>
+            </argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewaySoapAuthorizeItemsDataBuilder" type="Payments\SecureAcceptance\Gateway\Request\Soap\ItemsDataBuilder">
+        <arguments>
+            <argument name="objectName" xsi:type="string">order</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewaySoapCaptureItemsDataBuilder" type="Payments\SecureAcceptance\Gateway\Request\Soap\ItemsDataBuilder">
+        <arguments>
+            <argument name="objectName" xsi:type="string">invoice</argument>
+        </arguments>
+    </virtualType>
+
+    <virtualType name="PaymentsCoreGatewaySoapRefundItemsDataBuilder" type="Payments\SecureAcceptance\Gateway\Request\Soap\ItemsDataBuilder">
+        <arguments>
+            <argument name="objectName" xsi:type="string">creditmemo</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\Core\Gateway\Request\Soap\ItemsBuilder">
+        <plugin sortOrder="1" name="itemsDataBuilderStringFilterPlugin" type="Payments\Core\Plugin\Gateway\Request\StringFilterPlugin"/>
+    </type>
+
+    <type name="Payments\Core\Gateway\Request\Soap\AddressDataBuilder">
+        <plugin sortOrder="1" name="addressDataBuilderStringFilterPlugin" type="Payments\Core\Plugin\Gateway\Request\StringFilterPlugin"/>
+    </type>
+
+    <preference for="Payments\Core\StringUtils\RulePoolInterface" type="PaymentsCoreGatewayStringFilterRulePool"/>
 
     <type name="Magento\Framework\View\Asset\Minification">
         <plugin name="payments-core-minification-plugin" type="Payments\Core\Plugin\MinificationPlugin"/>

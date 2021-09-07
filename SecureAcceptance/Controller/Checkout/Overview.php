@@ -48,35 +48,17 @@ class Overview extends \Magento\Multishipping\Controller\Checkout\Overview
 
         try {
             $payment = $this->getRequest()->getPost('payment', []);
-            $payment['checks'] = [
-                \Magento\Payment\Model\Method\AbstractMethod::CHECK_USE_FOR_COUNTRY,
-                \Magento\Payment\Model\Method\AbstractMethod::CHECK_USE_FOR_CURRENCY,
-                \Magento\Payment\Model\Method\AbstractMethod::CHECK_ORDER_TOTAL_MIN_MAX,
-                \Magento\Payment\Model\Method\AbstractMethod::CHECK_ZERO_TOTAL,
-            ];
 
-            $tokenId = $payment['token_public_hash'];
-            $token = $this->getToken($tokenId, $this->_getCheckout()->getCustomer()->getId());
-
-            if (!$token) {
-                throw new \Magento\Framework\Exception\LocalizedException(__('Please try again'));
+            if (!empty($payment)) {
+                $payment['checks'] = [
+                    \Magento\Payment\Model\Method\AbstractMethod::CHECK_USE_FOR_COUNTRY,
+                    \Magento\Payment\Model\Method\AbstractMethod::CHECK_USE_FOR_CURRENCY,
+                    \Magento\Payment\Model\Method\AbstractMethod::CHECK_ORDER_TOTAL_MIN_MAX,
+                    \Magento\Payment\Model\Method\AbstractMethod::CHECK_ZERO_TOTAL,
+                ];
+                $this->assignToken($payment);
+                $this->_getCheckout()->setPaymentMethod($payment);
             }
-
-            /**
-             * Prepare payment to be a vault payment
-             * @see \Magento\Vault\Model\Method\Vault::attachTokenExtensionAttribute
-             */
-            $this->_getCheckout()->getQuote()->getPayment()->setAdditionalInformation(
-                PaymentTokenInterface::PUBLIC_HASH,
-                $token->getPublicHash()
-            );
-
-            $this->_getCheckout()->getQuote()->getPayment()->setAdditionalInformation(
-                PaymentTokenInterface::CUSTOMER_ID,
-                $this->_getCheckout()->getCustomer()->getId()
-            );
-
-            $this->_getCheckout()->setPaymentMethod($payment);
 
             $this->_getState()->setCompleteStep(State::STEP_BILLING);
 
@@ -89,6 +71,34 @@ class Overview extends \Magento\Multishipping\Controller\Checkout\Overview
             $this->messageManager->addException($e, __('We cannot open the overview page.'));
             $this->_redirect('*/*/billing/');
         }
+    }
+
+    private function assignToken($payment)
+    {
+        if ($payment['method'] !== \Payments\SecureAcceptance\Model\Ui\ConfigProvider::CC_VAULT_CODE) {
+            return;
+        }
+
+        $tokenId = $payment['token_public_hash'];
+        $token = $this->getToken($tokenId, $this->_getCheckout()->getCustomer()->getId());
+
+        if (!$token) {
+            throw new \Magento\Framework\Exception\LocalizedException(__('Please try again'));
+        }
+
+        /**
+         * Prepare payment to be a vault payment
+         * @see \Magento\Vault\Model\Method\Vault::attachTokenExtensionAttribute
+         */
+        $this->_getCheckout()->getQuote()->getPayment()->setAdditionalInformation(
+            PaymentTokenInterface::PUBLIC_HASH,
+            $token->getPublicHash()
+        );
+
+        $this->_getCheckout()->getQuote()->getPayment()->setAdditionalInformation(
+            PaymentTokenInterface::CUSTOMER_ID,
+            $this->_getCheckout()->getCustomer()->getId()
+        );
     }
 
     /**

@@ -6,13 +6,10 @@ use Payments\Core\Model\Config;
 use Payments\Core\Service\AbstractConnection;
 use Payments\Tax\Model\Config as TaxConfig;
 use Magento\Framework\App\ProductMetadata;
-use Magento\Quote\Model\Quote\Address;
-use Magento\Tax\Api\Data\TaxClassInterface;
 use Payments\Core\Model\LoggerInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
-use \Magento\Sales\Model\Order\Payment\Transaction\BuilderInterface;
 
-class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
+class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection implements \Payments\Tax\Service\TaxServiceInterface
 {
     const SUCCESS_REASON_CODE = 100;
 
@@ -25,11 +22,6 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
      * @var RequestDataBuilder
      */
     private $requestDataHelper;
-
-    /**
-     * @var \Magento\Backend\Model\Auth\Session $session
-     */
-    private $session;
 
     /**
      * @var Config
@@ -57,14 +49,10 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
     private $taxClassRepository;
 
     /**
-     * @var \Magento\Checkout\Model\Session
+     * @var \Magento\Framework\Math\Random
      */
-    private $checkoutSession;
+    private $random;
 
-    /**
-     * @var \stdClass
-     */
-    private $response;
     /**
      * @var \Magento\Framework\Serialize\SerializerInterface
      */
@@ -77,11 +65,10 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
      * @param TaxConfig $taxConfig
      * @param LoggerInterface $logger
      * @param RequestDataBuilder $requestDataHelper
-     * @param \Magento\Backend\Model\Auth\Session $authSession
      * @param ProductMetadata $productMetadata
      * @param \Magento\Tax\Helper\Data $taxData
      * @param \Magento\Tax\Api\TaxClassRepositoryInterface $taxClassRepositoryInterface
-     * @param \Magento\Checkout\Model\Session $checkoutSession
+     * @param \Magento\Framework\Math\Random $random
      * @param \Magento\Framework\Serialize\SerializerInterface $serializer
      * @param \SoapClient|null $client
      * @throws \Exception
@@ -92,15 +79,17 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
         \Payments\Tax\Model\Config $taxConfig,
         \Payments\Core\Model\LoggerInterface $logger,
         \Payments\Core\Helper\RequestDataBuilder $requestDataHelper,
-        \Magento\Backend\Model\Auth\Session $authSession,
         ProductMetadata $productMetadata,
         \Magento\Tax\Helper\Data $taxData,
         \Magento\Tax\Api\TaxClassRepositoryInterface $taxClassRepositoryInterface,
-        \Magento\Checkout\Model\Session $checkoutSession,
+        \Magento\Framework\Math\Random $random,
         \Magento\Framework\Serialize\SerializerInterface $serializer,
         \SoapClient $client = null
     ) {
-        parent::__construct($scopeConfig, $logger);
+
+        if ($taxConfig->isTaxEnabled()) {
+            parent::__construct($scopeConfig, $logger);
+        }
 
         /**
          * Added soap client as parameter to be able to mock in unit tests.
@@ -114,33 +103,32 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
 
         $this->client = $this->getSoapClient();
         $this->requestDataHelper = $requestDataHelper;
-        $this->session = $authSession;
         $this->productMetadata = $productMetadata;
         $this->taxData = $taxData;
         $this->taxClassRepository = $taxClassRepositoryInterface;
-        $this->checkoutSession = $checkoutSession;
+        $this->random = $random;
         $this->serializer = $serializer;
     }
 
     /**
      * Tax calculation for order
      *
-     * @param \Magento\Quote\Model\Quote $quote
      * @param \Magento\Tax\Api\Data\QuoteDetailsInterface $quoteTaxDetails
-     * @param \Magento\Quote\Api\Data\ShippingAssignmentInterface $shippingAssignment
-     * @return $this
+     * @param null $storeId
+     *
+     * @return array|null
      */
     public function getTaxForOrder(
-        \Magento\Quote\Model\Quote $quote,
         \Magento\Tax\Api\Data\QuoteDetailsInterface $quoteTaxDetails,
-        \Magento\Quote\Api\Data\ShippingAssignmentInterface $shippingAssignment
+        $storeId = null
     ) {
-        $address = $shippingAssignment->getShipping()->getAddress();
-        $billingAddress = $quote->getBillingAddress();
 
-        if (!$address->getPostcode()) {
-            return $this;
+        if (!$this->taxConfig->isTaxEnabled()) {
+            return null;
         }
+
+        $shippingAddress = $quoteTaxDetails->getShippingAddress();
+        $billingAddress = $quoteTaxDetails->getBillingAddress();
 
         $request = new \stdClass();
         $request->merchantID = $this->gatewayConfig->getMerchantId();
@@ -149,23 +137,19 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
             $request->developerId = $developerId;
         }
 
-        $request->merchantReferenceCode = uniqid('tax_request_' . $quote->getId() . '_');
+        $request->merchantReferenceCode = $this->random->getUniqueHash('tax_request_');
 
         /**
          * Try to add the billingAddress from customer to billTo, when it's not available, use the store address
          * as billing address, since the tax is calculated based on store address (shipFrom)
          */
         $builtBillingAddress = $this->buildAddressForTax($billingAddress);
-        $request->billTo = ($builtBillingAddress !== null) ? $builtBillingAddress : $this->buildAddressForTax($address);
-        $request->shipTo = $this->buildAddressForTax($address);
-
-        $purchaseTotals = new \stdClass();
-        $purchaseTotals->currency = $quote->getQuoteCurrencyCode();
-        $request->purchaseTotals = $purchaseTotals;
+        $request->billTo = ($builtBillingAddress !== null) ? $builtBillingAddress : $this->buildAddressForTax($shippingAddress);
+        $request->shipTo = $this->buildAddressForTax($shippingAddress);
 
         $taxService = new \stdClass();
 
-        $shippingCountry = $address->getCountryId();
+        $shippingCountry = $shippingAddress->getCountryId();
         if ($shippingCountry == 'CA' || $shippingCountry == 'US') {
             $request->shipFrom = $this->buildStoreShippingFromForTax();
             $taxService = $this->buildTaxOrderConfigurationForTax($taxService);
@@ -180,55 +164,47 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
 
         if ($shippingCountry != 'US') {
             $taxService->sellerRegistration = $this->taxConfig->getTaxMerchantVat();
-            if ($address->getVatId() != null) {
-                $taxService->buyerRegistration = $address->getVatId();
+            if ($shippingAddress->getVatId() != null) {
+                $taxService->buyerRegistration = $shippingAddress->getVatId();
             }
         }
 
         $request->taxService = $taxService;
 
-        if (! $items = $this->buildItemNodeFromShippingItems($quote, $quoteTaxDetails)) {
-            return $this;
+        if (! $items = $this->buildItemNodeFromShippingItems($quoteTaxDetails, $storeId)) {
+            return null;
         }
 
         $request->item = $items;
 
-        if ($this->orderChanged($request)) {
-            $this->placeRequest($request);
-        } else {
-            $sessionResponse = $this->getSessionData('response');
+        $response = $this->placeRequest($request);
 
-            if (isset($sessionResponse)) {
-                $this->response = $sessionResponse;
-            }
+        if (!$this->isValidResponse($response)) {
+            $this->logger->error('Not valid response: ' . $response);
+            return null;
         }
 
-        return $this;
+        // convert stdObjects to arrays
+        return $this->serializer->unserialize($this->serializer->serialize($response));
     }
 
     private function placeRequest($request)
     {
-        $this->setSessionData('request', $this->serializer->serialize($request));
-
         try {
             $isValidShipToAddress = $this->validateAddress($request->shipTo);
             if ($isValidShipToAddress) {
                 $this->logger->debug([__METHOD__ => (array) $request]);
                 $response = $this->client->runTransaction($request);
                 $this->logger->debug([__METHOD__ => (array) $response]);
-
-                $this->response = $this->serializer->serialize($response);
-                $this->setSessionData('response', $this->serializer->serialize($response));
+                return $response;
             } else {
                 $this->logger->error("Tax: unable to request. Missing shipTo information");
-                $this->response = null;
-                $this->unsetSessionData('response');
             }
         } catch (\Exception $e) {
-            $this->response = null;
-            $this->unsetSessionData('response');
             $this->logger->error("Tax: " . $e->getMessage());
         }
+
+        return null;
     }
 
     /**
@@ -236,142 +212,17 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
      *
      * @return bool
      */
-    public function isValidResponse()
+    public function isValidResponse($response)
     {
-        $response = $this->serializer->unserialize($this->response);
 
-        if (!$response) {
-            return false;
+        if ($response != null) {
+            if ($response->reasonCode == self::SUCCESS_REASON_CODE && property_exists($response, 'taxReply')) {
+                return true;
+            }
         }
-
-        if ($response->reasonCode == self::SUCCESS_REASON_CODE && property_exists($response, 'taxReply')) {
-            return true;
-        }
+        $this->logger->error("Tax: Invalid Tax Service response.");
 
         return false;
-    }
-
-    /**
-     * Verify if request is different than the last one
-     *
-     * @param \stdClass $request
-     * @return bool
-     */
-    private function orderChanged($request)
-    {
-        $sessionRequest = $this->getSessionData('request');
-
-        if ($sessionRequest) {
-            $unserializedSessionRequest = $this->serializer->unserialize($sessionRequest);
-
-            if (!$unserializedSessionRequest) {
-                return false;
-            }
-
-            $this->logger->debug("Tax: comparing session request objects to see if we should re-request taxes");
-
-            if ($this->serializer->serialize($unserializedSessionRequest->item) != $this->serializer->serialize($request->item)) {
-                $this->logger->debug("Tax: items have changed so requesting taxes again");
-                return true;
-            }
-            if ($this->serializer->serialize($unserializedSessionRequest->shipTo) != $this->serializer->serialize($request->shipTo)) {
-                $this->logger->debug("Tax: shipping addresses have changed so requesting taxes again");
-                return true;
-            }
-            return false;
-
-        } else {
-            return true;
-        }
-    }
-
-    /**
-     * Get prefixed session data from checkout/session
-     *
-     * @param string $key
-     * @return object
-     */
-    public function getSessionData($key)
-    {
-        return $this->checkoutSession->getData('payments_tax_' . $key);
-    }
-
-    /**
-     * Set prefixed session data in checkout/session
-     *
-     * @param string $key
-     * @param string $val
-     * @return object
-     */
-    private function setSessionData($key, $val)
-    {
-        return $this->checkoutSession->setData('payments_tax_' . $key, $val);
-    }
-
-    /**
-     * Unset prefixed session data in checkout/session
-     *
-     * @param string $key
-     * @return object
-     */
-    private function unsetSessionData($key)
-    {
-        return $this->checkoutSession->unsetData('payments_tax_' . $key);
-    }
-
-    /**
-     * Get item based on the unit price
-     *
-     * @param \Magento\Tax\Api\Data\QuoteDetailsItemInterface $itemDataObject
-     * @return array
-     */
-    public function getItemFromResponse(\Magento\Tax\Api\Data\QuoteDetailsItemInterface $itemDataObject)
-    {
-        if ($this->response !== null && $this->response !== '') {
-            $response = $this->serializer->unserialize($this->response);
-
-            if (!$response || !property_exists($response, 'taxReply') || !property_exists($response->taxReply, 'item')) {
-                return null;
-            }
-
-            $items = $response->taxReply->item;
-
-            if (is_array($items)) {
-                foreach ($items as $item) {
-                    if (property_exists($item, 'taxableAmount')) {
-                        $unitPrice = $this->getPriceConsideringDiscount($itemDataObject);
-                        $linePrice = $unitPrice * $itemDataObject->getQuantity();
-
-                        if ($item->taxableAmount === $this->requestDataHelper->formatAmount($linePrice)) {
-                            return (array)$item;
-                        }
-                    }
-                }
-            }
-
-            if (is_object($items)) {
-                return (array) $items;
-            }
-        }
-    }
-
-    /**
-     * Get unit price considering discount
-     *
-     * @param \Magento\Tax\Api\Data\QuoteDetailsItemInterface $itemDataObject
-     * @return float
-     */
-    private function getPriceConsideringDiscount(\Magento\Tax\Api\Data\QuoteDetailsItemInterface $itemDataObject)
-    {
-        $discountAmount = $itemDataObject->getDiscountAmount();
-        $itemUnitPrice = $itemDataObject->getUnitPrice();
-        $unitPrice = $itemUnitPrice;
-
-        if ($discountAmount != null && $discountAmount > 0) {
-            $unitPrice = $itemUnitPrice - ($discountAmount / $itemDataObject->getQuantity());
-        }
-
-        return $this->requestDataHelper->formatAmount($unitPrice);
     }
 
     /**
@@ -382,167 +233,127 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
      * @return array
      */
     private function buildItemNodeFromShippingItems(
-        \Magento\Quote\Model\Quote $quote,
-        \Magento\Tax\Api\Data\QuoteDetailsInterface $quoteTaxDetails
+        \Magento\Tax\Api\Data\QuoteDetailsInterface $quoteTaxDetails,
+        $storeId = null
     ) {
         $lineItems = [];
-        $store = $quote->getStore();
         $items = $quoteTaxDetails->getItems();
-
-        $shippingPriceIncludeTax = (bool) $this->config->getValue(
-            'tax/calculation/shipping_includes_tax',
-            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
-            $store
-        );
-
         $itemId = 0;
 
-        if (!empty($items)) {
-            $parentQuantities = [];
+        if (empty($items)) {
+            return $lineItems;
+        }
 
-            foreach ($items as $i => $item) {
-                if ($item->getType() == 'product') {
-                    $lineItem = new \stdClass();
-                    $id = $i;
-                    $parentId = $item->getParentCode();
-                    $quantity = (int) $item->getQuantity();
-                    $unitPrice = (float) $item->getUnitPrice();
-                    $discount = (float) $item->getDiscountAmount() / $quantity;
-                    $extensionAttributes = $item->getExtensionAttributes();
-                    $sku = $extensionAttributes->__toArray()['sku'];
-                    $productName = $extensionAttributes->__toArray()['product_name'];
+        $parentQuantities = [];
 
-                    if ($extensionAttributes->getProductType() == \Magento\Catalog\Model\Product\Type::TYPE_BUNDLE) {
-                        $parentQuantities[$id] = $quantity;
-
-                        if ($extensionAttributes->getPriceType() ==
-                            \Magento\Bundle\Model\Product\Price::PRICE_TYPE_DYNAMIC
-                        ) {
-                            continue;
-                        }
-                    }
-
-                    if (isset($parentQuantities[$parentId])) {
-                        $quantity *= $parentQuantities[$parentId];
-                    }
-
-                    if (!$this->taxData->applyTaxAfterDiscount($store)) {
-                        $discount = 0;
-                    }
-
-                    if ($item->getTaxClassKey()->getValue()) {
-                        $taxClass = $this->taxClassRepository->get($item->getTaxClassKey()->getValue());
-                        $taxCode = $taxClass->getClassName();
-                    } else {
-                        $taxCode = \Payments\Tax\Model\Config::TAX_DEFAULT_CODE;
-                    }
-
-                    if ($this->productMetadata->getEdition() == 'Enterprise' &&
-                        $extensionAttributes->getProductType() ==
-                        \Magento\GiftCard\Model\Catalog\Product\Type\Giftcard::TYPE_GIFTCARD
-                    ) {
-                        $giftTaxClassId = $this->config->getValue('tax/classes/wrapping_tax_class');
-
-                        if ($giftTaxClassId) {
-                            $giftTaxClass = $this->taxClassRepository->get($giftTaxClassId);
-                            $giftTaxClassCode = $giftTaxClass->getClassName();
-                            $taxCode = $giftTaxClassCode;
-                        } else {
-                            $taxCode = \Payments\Tax\Model\Config::TAX_DEFAULT_CODE;
-                        }
-                    }
-
-                    $lineItem->id = $id;
-                    $lineItem->unitPrice = $this->requestDataHelper->formatAmount($unitPrice - $discount);
-
-                    if ($lineItem->unitPrice <= 0) {
-                        continue;
-                    }
-
-                    $lineItem->quantity = (string) $quantity;
-                    $lineItem->productCode = $taxCode;
-                    $lineItem->productName = $productName;
-                    $lineItem->productSKU = $sku;
-
-                    $lineItems[] = $lineItem;
-                }
-
-                $itemId++;
+        foreach ($items as $i => $item) {
+            /** @var \Magento\Tax\Api\Data\QuoteDetailsItemExtensionInterface $extensionAttributes */
+            if (!$extensionAttributes = $item->getExtensionAttributes()) {
+                continue;
             }
 
-            if (!$shippingPriceIncludeTax) {
-                $shippingTaxClassId = $this->config->getValue(
-                    'tax/classes/shipping_tax_class',
-                    \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
-                    $store
-                );
+            $lineItem = new \stdClass();
+            $id = $i;
+            $parentId = $item->getParentCode();
+            $unitPrice = (float) $extensionAttributes->getPriceForTaxCalculation() ?: $item->getUnitPrice();
+            $quantity = (int)$item->getQuantity();
+            $discount = (float)$item->getDiscountAmount() / $quantity;
 
-                if (!empty($shippingTaxClassId)) {
-                    /** @var TaxClassInterface $shippingTaxClass */
-                    $shippingTaxClass = $this->taxClassRepository->get($shippingTaxClassId);
-                    $lineItem = new \stdClass();
-                    $lineItem->id = $itemId;
-                    $lineItem->unitPrice = $this->requestDataHelper->formatAmount(
-                        $quote->getShippingAddress()->getShippingAmount()
-                    );
-                    $lineItem->quantity = "1";
-                    $lineItem->productCode = $shippingTaxClass->getClassName();
-                    $lineItem->productName = 'shipping';
-                    $lineItem->productSKU = 'SHIP' . $itemId;
-
-                    $lineItems[] = $lineItem;
+            if ($extensionAttributes->getProductType() == \Magento\Catalog\Model\Product\Type::TYPE_BUNDLE) {
+                $parentQuantities[$id] = $quantity;
+                if ($extensionAttributes->getPriceType() == \Magento\Bundle\Model\Product\Price::PRICE_TYPE_DYNAMIC) {
+                    continue;
                 }
             }
+
+            if (isset($parentQuantities[$parentId])) {
+                $quantity *= $parentQuantities[$parentId];
+            }
+
+            if (!$this->taxData->applyTaxAfterDiscount($storeId)) {
+                $discount = 0;
+            }
+
+            if (!$taxClassCodeId = $item->getTaxClassKey()->getValue()) {
+                $taxClassCodeId = $this->taxData->getDefaultProductTaxClass();
+            }
+
+            if ($this->productMetadata->getEdition() == 'Enterprise' &&
+                $extensionAttributes->getProductType() ==
+                \Magento\GiftCard\Model\Catalog\Product\Type\Giftcard::TYPE_GIFTCARD
+            ) {
+                $giftTaxClassId = $this->config->getValue('tax/classes/wrapping_tax_class');
+                if ($giftTaxClassId) {
+                    $taxClassCodeId = $giftTaxClassId;
+                }
+            }
+
+            $taxClass = $this->taxClassRepository->get($taxClassCodeId);
+            $taxCode = $taxClass->getClassName();
+
+            $lineItem->id = $id;
+            $lineItem->unitPrice = $this->requestDataHelper->formatAmount($unitPrice - $discount);
+
+            if ($lineItem->unitPrice <= 0) {
+                continue;
+            }
+
+            $lineItem->quantity = (string)$quantity;
+            $lineItem->productCode = $taxCode;
+            $lineItem->productName = $extensionAttributes->getProductName();
+            $lineItem->productSKU = $extensionAttributes->getSku();
+
+            $lineItems[] = $lineItem;
+
+            $itemId++;
         }
 
         return $lineItems;
     }
 
     /**
-     * @param Address $address
+     * @param \Magento\Customer\Model\Data\Address $address
      * @return \stdClass $builtAddress
      */
-    private function buildAddressForTax(\Magento\Quote\Model\Quote\Address $address)
+    private function buildAddressForTax($address)
     {
         $builtAddress = new \stdClass();
 
-        if ($address->getCountry() !== null) {
-            if ($address->getCountry() == 'CA' || $address->getCountry() == 'US') {
-                $builtAddress->state = $address->getRegionCode();
+        if ($address->getCountryId()) {
+            $region = $address->getRegion();
+            if ($address->getCountryId() == 'CA' || $address->getCountryId() == 'US') {
+                $builtAddress->state = $region->getRegionCode();
             } else {
-                $builtAddress->state = $address->getRegion();
+                $builtAddress->state = $region->getRegion();
             }
         }
 
-        if ($address->getData(Address::KEY_POSTCODE) !== null) {
+        if ($address->getPostcode()) {
             $builtAddress->postalCode = $address->getPostcode();
         }
 
-        if ($address->getData(Address::KEY_FIRSTNAME) !== null) {
+        if ($address->getFirstname()) {
             $builtAddress->firstName = $address->getFirstname();
         }
 
-        if ($address->getData(Address::KEY_LASTNAME) !== null) {
+        if ($address->getLastname()) {
             $builtAddress->lastName = $address->getLastname();
         }
 
-        if ($address->getData(Address::KEY_STREET) !== null) {
-            $builtAddress->street1 = $address->getStreetLine(1);
-            $addressLine2 = $address->getStreetLine(2);
-            if ($addressLine2 !== '' && $addressLine2 !== null && $addressLine2 !== $address->getStreetLine(1)) {
-                $builtAddress->street2 = $addressLine2;
+        if ($street = $address->getStreet()) {
+            foreach ($street as $i => $v) {
+                if (empty($v)) {
+                    continue;
+                }
+                $builtAddress->{'street' . ($i + 1)} = $v;
             }
         }
 
-        if ($address->getData(Address::KEY_CITY) !== null) {
+        if ($address->getCity()) {
             $builtAddress->city = $address->getCity();
         }
 
-        if ($address->getData(Address::KEY_EMAIL) !== null) {
-            $builtAddress->email = $address->getEmail();
-        }
-
-        if ($address->getData(Address::KEY_COUNTRY_ID) !== null) {
+        if ($address->getCountryId()) {
             $builtAddress->country = $address->getCountryId();
         }
 

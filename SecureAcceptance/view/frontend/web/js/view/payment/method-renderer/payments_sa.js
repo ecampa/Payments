@@ -315,7 +315,7 @@ define(
                             that.updateIframePosition.bind(that)();
 
                             if (that.isIframeSandboxEnabled()) {
-                                el.attr('sandbox', "allow-top-navigation allow-scripts allow-forms");
+                                el.attr('sandbox', "allow-top-navigation allow-scripts allow-forms allow-same-origin");
                             }
                         }
                     ).always(

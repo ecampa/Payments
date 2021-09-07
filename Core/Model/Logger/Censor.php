@@ -14,6 +14,8 @@ class Censor
         'bankTransitNumber',
         'card_cvn',
         'cvNumber',
+        'expirationMonth',
+        'expirationYear',
     ];
 
     private $immutableFields = [
@@ -85,6 +87,13 @@ class Censor
 
         if (is_string($value)) {
             $value = $this->censorString($value);
+            return;
+        }
+
+        if ((!is_object($value) && settype($item, 'string') !== false)
+            || is_object($value) && method_exists($value, '__toString')
+        ) {
+            $value = $this->censorString((string)$value);
             return;
         }
 

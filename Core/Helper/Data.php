@@ -80,9 +80,10 @@ class Data extends \Payments\Core\Helper\AbstractDataBuilder
      * @param \Magento\Sales\Model\OrderFactory $orderFactory
      * @param \Payments\Core\Model\Config $config
      * @param \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $orderCollectionFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory
      * @param \Magento\Backend\Model\Auth $auth
      * @param \Magento\GiftMessage\Model\Message $giftMessage
-     * @param \Payments\Core\Model\LoggerInterface $logger
+     * @param \Magento\Framework\Serialize\SerializerInterface $serializer
      * @param array $additionalInfoKeys
      */
     public function __construct(
@@ -97,6 +98,7 @@ class Data extends \Payments\Core\Helper\AbstractDataBuilder
         \Magento\Sales\Model\OrderFactory $orderFactory,
         \Payments\Core\Model\Config $config,
         \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $orderCollectionFactory,
+        \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory,
         \Magento\Backend\Model\Auth $auth,
         \Magento\GiftMessage\Model\Message $giftMessage,
         \Magento\Framework\Serialize\SerializerInterface $serializer,
@@ -108,6 +110,7 @@ class Data extends \Payments\Core\Helper\AbstractDataBuilder
             $checkoutSession,
             $data,
             $orderCollectionFactory,
+            $orderGridCollectionFactory,
             $auth,
             $giftMessage
         );

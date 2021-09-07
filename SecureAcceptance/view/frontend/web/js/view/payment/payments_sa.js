@@ -11,22 +11,15 @@ define(
 
         var saType = window.checkoutConfig.payment.payments_sa.sa_type;
 
+        if (!window.checkoutConfig.payment.payments_sa.iframe_post && saType !== 'flex') {
+            return Component.extend({});
+        }
+
         if (saType === 'flex') {
             rendererList.push(
                 {
                     type: 'payments_sa',
                     component: 'Payments_SecureAcceptance/js/view/payment/method-renderer/microform'
-                }
-            );
-            return Component.extend({});
-        }
-
-        if (!window.checkoutConfig.payment.payments_sa.iframe_post) {
-           
-            rendererList.push(
-                {
-                    type: 'payments_sa',
-                    component: 'Payments_SecureAcceptance/js/view/payment/method-renderer/payments_sa'
                 }
             );
             return Component.extend({});

@@ -1,7 +1,9 @@
 <?php
 namespace Payments\SecureAcceptance\Plugin\Session;
 
-
+/**
+ * Class SidResolverPlugin
+ */
 class SidResolverPlugin
 {
     /**
@@ -10,9 +12,9 @@ class SidResolverPlugin
     private $request;
 
     /**
-     * @var \Payments\SecureAcceptance\Gateway\Config\Config
+     * @var \Payments\SecureAcceptance\Gateway\Config\SaConfigProviderInterface
      */
-    private $config;
+    private $configProvider;
 
     /**
      * @var \Magento\Framework\Encryption\EncryptorInterface
@@ -31,12 +33,12 @@ class SidResolverPlugin
      */
     public function __construct(
         \Magento\Framework\App\RequestInterface $request,
-        \Payments\SecureAcceptance\Gateway\Config\Config $config,
+        \Payments\SecureAcceptance\Gateway\Config\SaConfigProviderInterfaceFactory $configProviderFactory,
         \Magento\Framework\Encryption\EncryptorInterface $encryptor,
         \Payments\SecureAcceptance\Model\SignatureManagementInterface $signatureManagement
     ) {
         $this->request = $request;
-        $this->config = $config;
+        $this->configProvider = $configProviderFactory->create();
         $this->encryptor = $encryptor;
         $this->signatureManagement = $signatureManagement;
     }
@@ -60,20 +62,18 @@ class SidResolverPlugin
             return $result;
         }
 
-        if (!$this->signatureManagement->validateSignature($this->request->getParams(), $this->getSecretKey())) {
+        $storeId = $this->getSaReqParam(\Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_STORE_ID);
+
+        if (!$this->signatureManagement->validateSignature($this->request->getParams(), $this->configProvider->getSecretKey($storeId))) {
             return $result;
         }
 
         return $this->encryptor->decrypt($encryptedSid);
     }
 
-
-    private function getSecretKey()
+    private function getSaReqParam($value)
     {
-        if ($this->config->isSilent()) {
-            return $this->config->getSopSecretKey();
-        }
-        return $this->config->getAuthSecretKey();
+        return $this->request->getParam('req_' . $value, null);
     }
 
 }

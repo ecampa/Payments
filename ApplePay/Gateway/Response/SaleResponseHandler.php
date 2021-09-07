@@ -56,5 +56,10 @@ class SaleResponseHandler extends \Payments\ApplePay\Gateway\Response\AbstractRe
             $payment->setIsTransactionPending(false);
             $payment->setShouldCloseParentTransaction(false);
         }
+
+        $payment->setAdditionalInformation(
+            self::RECONCILIATION_ID,
+            $response['ccCaptureReply']->{self::RECONCILIATION_ID} ?? null
+        );
     }
 }

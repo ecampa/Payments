@@ -40,7 +40,10 @@
             <span id="flex-cc-number" class="flex cc-number input-text" data-bind="template: {afterRender: formAfterRender() }"></span>
         </div>
         <input type="hidden" name="microform"
-               data-validate="{'microform-card-valid': {selector: '#flex-cc-number', errorClass: 'mage-error'}}"
+               data-validate="{
+                  'microform-card-valid': {selector: '#flex-cc-number', errorClass: 'mage-error'},
+                  'microform-card-valid-type': {selector: '#flex-cc-number', errorClass: 'mage-error'}
+               }"
         />
     </div>
     <div class="field date required" data-bind="attr: {id: getCode() + '_cc_type_exp_div'}">
@@ -86,17 +89,7 @@
             <span><!-- ko i18n: 'Card Verification Number'--><!-- /ko --></span>
         </label>
         <div class="control _with-tooltip">
-            <input type="number"
-                   autocomplete="off"
-                   class="input-text cvv"
-                   name="payment[cc_cid]"
-                   value=""
-                   data-bind="attr: {id: getCode() + '_cc_cid',
-                        title: $t('Card Verification Number'),
-                        'data-container': getCode() + '-cc-cvv',
-                        'data-validate': JSON.stringify({'required-number':true, 'validate-cc-cvn':'#' + getCode() + '_cc_type'})},
-                        enable: isActive($parents),
-                        value: creditCardVerificationNumber" />
+            <span id="flex-cc-cvn" class="flex input-text cvv"></span>
             <div class="field-tooltip toggle">
                 <span class="field-tooltip-action action-cvv"
                       tabindex="0"
@@ -109,6 +102,9 @@
                      data-bind="html: getCvvImageHtml()"></div>
             </div>
         </div>
+        <input type="hidden" name="microform-cvn"
+               data-validate="{'microform-card-valid-cvn': {selector: '#flex-cc-cvn', errorClass: 'mage-error'}}"
+        />
     </div>
     <!-- /ko -->
 </fieldset>

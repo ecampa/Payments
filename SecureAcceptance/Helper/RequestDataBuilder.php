@@ -21,14 +21,18 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
     const REQ_USE_IFRAME = 'req_merchant_defined_data11';
     const PAY_URL = 'pay_url';
     const PAY_TEST_URL = 'pay_test_url';
+    const KEY_ORDER_ID = 'merchant_secure_data1';
     const KEY_QUOTE_ID = 'merchant_secure_data1';
     const KEY_SID = 'merchant_secure_data2';
+    const KEY_STORE_ID = 'merchant_secure_data3';
+    const KEY_SCOPE = 'merchant_secure_data4';
     const KEY_AGREEMENT_IDS = 'merchant_defined_data12';
 
     const TYPE_SALE = 'sale';
     const TYPE_AUTHORIZATION = 'authorization';
     const TYPE_CREATE_TOKEN = 'create_payment_token';
     const CC_CAPTURE_SERVICE_TOTAL_COUNT = 99;
+    const CARD_TYPE_SELECTION_INDICATOR_BY_CARDHOLDER = '1';
 
     /**
      * @var Resolver
@@ -74,8 +78,8 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
      * @var array
      */
     private $requestUrls = [
-        self::PAY_URL => '{{paymentUrlSecureAcceptance}}',
-        self::PAY_TEST_URL => '{{testPaymentUrlSecureAcceptance}}'
+        self::PAY_URL => 'https://secureacceptance.cybersource.com/pay',
+        self::PAY_TEST_URL => 'https://testsecureacceptance.cybersource.com/pay'
     ];
 
     /**
@@ -84,10 +88,32 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
     private $signatureManagement;
 
     /**
+     * @var \Magento\Framework\Encryption\EncryptorInterface
+     */
+    private $encryptor;
+
+    /**
+     * @var \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory
+     */
+    private $orderGridCollectionFactory;
+
+    /**
+     * @var \Magento\Tax\Model\Config
+     */
+    private $taxConfig;
+
+    /**
+     * @var \Payments\Core\StringUtils\FilterInterface
+     */
+    private $filter;
+
+    /**
      * RequestDataBuilder constructor.
+     *
      * @param \Magento\Framework\App\Helper\Context $context
      * @param \Magento\Customer\Model\Session $customerSession
      * @param CollectionFactory $orderCollectionFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory
      * @param \Magento\Framework\Session\SessionManagerInterface $checkoutSession
      * @param Resolver $resolver
      * @param CheckoutHelper $checkoutHelper
@@ -96,12 +122,15 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
      * @param \Magento\Customer\Model\Customer $customerModel
      * @param \Magento\GiftMessage\Model\Message $giftMessage
      * @param \Magento\Sales\Model\OrderRepository $orderRepository
+     * @param \Payments\SecureAcceptance\Model\SignatureManagementInterface $signatureManagement
+     * @param \Magento\Framework\Encryption\EncryptorInterface $encryptor
      * @param \Payments\SecureAcceptance\Helper\Vault $vaultHelper
      */
     public function __construct(
         \Magento\Framework\App\Helper\Context $context,
         \Magento\Customer\Model\Session $customerSession,
         \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $orderCollectionFactory,
+        \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory,
         \Magento\Framework\Session\SessionManagerInterface $checkoutSession,
         Resolver $resolver,
         CheckoutHelper $checkoutHelper,
@@ -111,6 +140,9 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         \Magento\GiftMessage\Model\Message $giftMessage,
         \Magento\Sales\Model\OrderRepository $orderRepository,
         \Payments\SecureAcceptance\Model\SignatureManagementInterface $signatureManagement,
+        \Payments\Core\StringUtils\FilterInterface $filter,
+        \Magento\Framework\Encryption\EncryptorInterface $encryptor,
+        \Magento\Tax\Model\Config $taxConfig,
         \Payments\SecureAcceptance\Helper\Vault $vaultHelper
     ) {
         parent::__construct(
@@ -119,6 +151,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
             $checkoutSession,
             $checkoutHelper,
             $orderCollectionFactory,
+            $orderGridCollectionFactory,
             $auth,
             $giftMessage
         );
@@ -130,6 +163,10 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         $this->orderRepository = $orderRepository;
         $this->vaultHelper = $vaultHelper;
         $this->signatureManagement = $signatureManagement;
+        $this->filter = $filter;
+        $this->encryptor = $encryptor;
+        $this->orderGridCollectionFactory = $orderGridCollectionFactory;
+        $this->taxConfig = $taxConfig;
     }
 
     /**
@@ -204,10 +241,6 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
             'currency' => $currencyCode ? $currencyCode : $quote->getCurrency()->getData('base_currency_code'),
             'payment_method' => 'card',
             'partner_solution_id' => self::PARTNER_SOLUTION_ID,
-            'developer_id' => $this->scopeConfig->getValue(
-                "payment/payments_sa/developer_id",
-                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
-            ),
             //payer auth fields
             'payer_auth_enroll_service_run' => 'true'
         ];
@@ -218,6 +251,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
 
         if (isset($cardType)) {
             $params['card_type'] = $cardType;
+            $params['card_type_selection_indicator'] = self::CARD_TYPE_SELECTION_INDICATOR_BY_CARDHOLDER;
         }
 
         if (isset($cvv)) {
@@ -234,6 +268,11 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         $params = $this->buildDecisionManagerFieldsForSA($quote, $params);
         $params = array_merge($params, $this->buildOrderItems($orderItems));
 
+        if ($shippingAddress->getBaseShippingAmount() > 0 ) {
+            $params = array_merge($params, $this->getShippingOrderLineItem($shippingAddress->getBaseShippingAmount(), $params['line_item_count']));
+            $params['line_item_count'] = $params['line_item_count'] + 1;
+        }
+
         if (!empty($token) || $token !== null) {
             $params['payment_token'] = $token;
         }
@@ -243,6 +282,18 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         if (!empty($fingerprintId)) {
             $params['device_fingerprint_id'] = $fingerprintId;
         }
+
+        //Admin initiated transaction
+        if (empty($quote->getRemoteIp())) {
+            $params['e_commerce_indicator'] = 'moto';
+        }
+
+
+        $params[static::KEY_SID] = $this->encryptor->encrypt($this->checkoutSession->getSessionId());
+
+        $params[static::KEY_STORE_ID] = $this->checkoutSession->getStore()
+            ? $this->checkoutSession->getStore()->getId()
+            : $this->checkoutSession->getQuote()->getStoreId();
 
         $params = $this->filterParams($params);
 
@@ -265,13 +316,19 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
 
         $params['customer_email'] = $quote->getCustomerEmail();
         $params['customer_lastname'] = $quote->getCustomerLastname();
-        $params['developer_id'] = $this->gatewayConfig->getDeveloperId();
         $params['customer_cookies_accepted'] = 'false';
 
         if ($this->gatewayConfig->getUseIframe()) {
             $params[self::USE_IFRAME] = "1";
             $params['use_iframe'] = 1;
         }
+
+        $params[static::KEY_SID] = $this->encryptor->encrypt($this->checkoutSession->getSessionId());
+
+        $params[static::KEY_STORE_ID] = $this->checkoutSession->getStore()
+            ? $this->checkoutSession->getStore()->getId()
+            : $this->checkoutSession->getQuote()->getStoreId();
+
 
         $params = $this->filterParams($params);
         $params['signed_field_names'] = $this->getSignedFields($params);
@@ -321,8 +378,31 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         $params = $this->buildDecisionManagerFieldsForSA($quote, $params);
         $params = array_merge($params, $this->buildOrderItems($quote->getAllVisibleItems()));
 
+        if ($shippingAddress->getBaseShippingAmount() > 0 ) {
+            $params = array_merge($params, $this->getShippingOrderLineItem($shippingAddress->getBaseShippingAmount(), $params['line_item_count']));
+            $params['line_item_count'] = $params['line_item_count'] + 1;
+        }
+
+        //Admin initiated transaction
+        if (empty($quote->getRemoteIp())) {
+            $params['e_commerce_indicator'] = 'moto';
+        }
+
+
         return $params;
     }
+
+    private function getShippingOrderLineItem($shippingAmount, $id)
+    {
+        $toReturn['item_' . $id . '_name'] = 'shipping';
+        $toReturn['item_' . $id . '_sku'] = 'shipping_and_handling';
+        $toReturn['item_' . $id . '_quantity'] = 1;
+        $toReturn['item_' . $id . '_unit_price'] = $this->formatAmount($shippingAmount);
+        $toReturn['item_' . $id . '_code'] = 'shipping_and_handling';
+
+        return $toReturn;
+    }
+
 
     /**
      *
@@ -352,8 +432,10 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
             $data['merchant_defined_data5'] = round((time() - strtotime($customer->getData('created_at'))) / (3600 * 24));// Member Account Age (Days)
         }
 
-        $orders = $this->orderCollectionFactory->create()
-            ->addFieldToFilter('customer_email', $quote->getCustomerEmail());
+        $orders = $this->orderGridCollectionFactory->create()
+            ->addFieldToFilter('customer_email', $quote->getCustomerEmail())
+        ;
+        $orders->getSelect()->limit(1);
 
         $data['merchant_defined_data6'] = (int)(count($orders) > 0); // Repeat Customer
         $data['merchant_defined_data20'] = $quote->getCouponCode(); //Coupon Code
@@ -442,7 +524,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
             'bill_to_forename' => $billingAddress->getData('firstname'),
             'bill_to_surname' => $billingAddress->getData('lastname'),
             'bill_to_email' => $customerEmail,
-            'bill_to_phone' => (!empty($billingAddress->getData('telephone')) ? $billingAddress->getData('telephone') : ''),
+            'bill_to_phone' => $billingAddress->getTelephone(),
             'bill_to_address_line1' => $billingAddress->getStreetLine(1),
             'bill_to_address_line2' => $billingAddress->getStreetLine(2),
             'bill_to_address_city' => $billingAddress->getData('city'),
@@ -526,12 +608,12 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
             if (empty($qty)) {
                 $qty = 1;
             }
-
+            $type = $item->getProductType() ?: $item->getOrderItem()->getProductType();
 
             if ($item->getProductType() === \Magento\Catalog\Model\Product\Type::TYPE_BUNDLE) {
 
                 //$amount = ($item->getPrice() - ($item->getDiscountAmount() / $qty)) * $qty;
-                $params['item_' . $i . '_name'] = preg_replace("/[^a-zA-Z0-9\s]/", "", $item->getName());
+                $params['item_' . $i . '_name'] = $this->filter->filter($item->getName());
                 $params['item_' . $i . '_sku'] = $item->getSku();
                 $params['item_' . $i . '_quantity'] = $qty;
                 //$params['item_' . $i . '_unit_price'] = $this->formatAmount($amount);
@@ -549,6 +631,8 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
                     $params['item_' . $j . '_quantity'] = $option->getValue();
                     $params['item_' . $j . '_unit_price'] = $this->formatAmount(0);
                     $params['item_' . $j . '_tax_amount'] = $this->formatAmount(0);
+                    $params['item_' . $j . '_code'] = $type;
+
 
                     $j++;
                 }
@@ -557,12 +641,19 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
 
                 $params['item_' . $i . '_unit_price'] = $this->formatAmount($amount);
             } else {
-                $amount = ($item->getPrice() - ($item->getDiscountAmount() / $qty)) * $qty;
-                $params['item_' . $i . '_name'] = preg_replace("/[^a-zA-Z0-9\s]/", "", $item->getName());
+
+                $amount = (
+                    ($this->taxConfig->priceIncludesTax($item->getStoreId())
+                        ? $item->getPriceInclTax()
+                        : $item->getPrice())
+                    - ($item->getDiscountAmount() / $qty));
+
+                $params['item_' . $i . '_name'] = $this->filter->filter($item->getName());
                 $params['item_' . $i . '_sku'] = $item->getSku();
                 $params['item_' . $i . '_quantity'] = $qty;
                 $params['item_' . $i . '_unit_price'] = $this->formatAmount($amount);
                 $params['item_' . $i . '_tax_amount'] = $this->formatAmount($item->getTaxAmount());
+                $params['item_' . $i . '_code'] = $type;
             }
             $i++;
         }
@@ -570,6 +661,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         $params['line_item_count'] = ($j > 0) ? $j : $i;
         return $params;
     }
+
 
     /**
      * @return string
@@ -720,6 +812,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         $data['bill_to_forename'] = $quote->getBillingAddress()->getFirstname();
         $data['bill_to_surname'] = $quote->getBillingAddress()->getLastname();
         $data['bill_to_email'] = $quote->getBillingAddress()->getEmail();
+        $data['bill_to_phone'] = $quote->getBillingAddress()->getTelephone();
         $data['bill_to_address_country'] = $quote->getBillingAddress()->getCountryId();
         $data['bill_to_address_city'] = $quote->getBillingAddress()->getCity();
         $data['bill_to_address_state'] = $quote->getBillingAddress()->getRegionCode();
@@ -782,6 +875,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         $billTo->state = $quote->getBillingAddress()->getRegionCode();
         $billTo->street1 = $quote->getBillingAddress()->getStreetLine(1);
         $billTo->postalCode = $quote->getBillingAddress()->getPostcode();
+        $billTo->phoneNumber = $quote->getBillingAddress()->getTelephone();
 
         $request->billTo = $billTo;
 

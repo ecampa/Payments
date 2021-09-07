@@ -24,6 +24,9 @@ abstract class AbstractResponseHandler
     const PAYMENT_STATUS_ABANDONED = 'abandoned';
     const PAYMENT_STATUS_FAILED = 'failed';
 
+    const CAPTURE_TRANSACTION_ID =  'CaptureTransactionId';
+
+
     /**
      * @var SubjectReader
      */

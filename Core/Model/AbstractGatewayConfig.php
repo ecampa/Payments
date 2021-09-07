@@ -31,20 +31,18 @@ abstract class AbstractGatewayConfig extends \Magento\Payment\Gateway\Config\Con
     const KEY_PAYMENT_METHOD = 'payment_method';
     const KEY_AUTH_INDICATOR = 'auth_indicator';
     const KEY_ENABLE_CVV = 'enable_cvv';
-    const KEY_REPORT_USERNAME = 'report_username';
-    const KEY_REPORT_PASSWORD = 'report_password';
-    const KEY_REPORT_URL = 'report_url';
     const KEY_ENABLE_DM_CRON = 'enable_dm_cron';
+    const KEY_DATE_DM_CRON = 'dm_report_start_date';
     const KEY_SHOW_EXACT_ERROR = 'show_exact_error';
     const KEY_ENABLED_DM_CRON_ACCEPTED_SETTLEMENT = 'enable_dm_accepted_settlement';
     const KEY_SA_TYPE = 'secureacceptance_type';
     const PATH = 'payment/payments_section/payments/';
-    
+
     public function getDeveloperId()
     {
         return $this->getValue(self::KEY_DEVELOPER_ID);
     }
-    
+
     public function isActive()
     {
         return $this->getValue(self::KEY_ACTIVE);
@@ -78,9 +76,9 @@ abstract class AbstractGatewayConfig extends \Magento\Payment\Gateway\Config\Con
             : 0;
     }
 
-    public function isSilent()
+    public function isSilent($storeId = null)
     {
-        return ($this->getSaType() == \Payments\Core\Model\Source\SecureAcceptance\Type::SA_SOP);
+        return ($this->getSaType($storeId) == \Payments\Core\Model\Source\SecureAcceptance\Type::SA_SOP);
     }
 
     public function getSaType($storeId = null)
@@ -168,24 +166,14 @@ abstract class AbstractGatewayConfig extends \Magento\Payment\Gateway\Config\Con
         return (bool) $this->getValue(self::KEY_ENABLE_CVV);
     }
 
-    public function getReportUsername()
-    {
-        return $this->getValue(self::KEY_REPORT_USERNAME);
-    }
-
-    public function getReportPassword()
-    {
-        return $this->getValue(self::KEY_REPORT_PASSWORD);
-    }
-
-    public function getReportUrl()
-    {
-        return $this->getValue(self::KEY_REPORT_URL);
-    }
-
     public function isDecisionManagerCronEnabled($storeId = null)
     {
         return (bool) $this->getValue(self::KEY_ENABLE_DM_CRON, $storeId);
+    }
+
+    public function getDecisionManagerCronStartDate($storeId = null)
+    {
+        return $this->getValue(self::KEY_DATE_DM_CRON, $storeId);
     }
 
     public function decisionManagerSettlementEnabled()

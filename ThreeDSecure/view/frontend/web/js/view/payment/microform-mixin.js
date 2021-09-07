@@ -2,8 +2,9 @@ define([
     'jquery',
     'mage/utils/wrapper',
     'Payments_ThreeDSecure/js/view/payment/payer-authentication',
-    'Payments_ThreeDSecure/js/view/payment/pa-enabler'
-], function ($, wrapper, pa, Enabler) {
+    'Payments_ThreeDSecure/js/view/payment/pa-enabler',
+    'Payments_ThreeDSecure/js/model/jwt-decode'
+], function ($, wrapper, pa, Enabler, jwtDecode) {
     'use strict';
 
     return function (Component) {
@@ -20,8 +21,14 @@ define([
             placeOrderContinue: function (data, event, _super) {
                 var cardBin;
 
-                if (this.microformResponse && this.microformResponse.maskedPan) {
-                    cardBin = this.microformResponse.maskedPan.substr(0, 6);
+                if (!this.microformResponse) {
+                    pa.placeOrder(this, _super, cardBin);
+                    return;
+                }
+
+                var jwt = jwtDecode(this.microformResponse);
+                if (jwt && jwt.data && jwt.data.number) {
+                    cardBin = jwt.data.number.substr(0, 6);
                 }
 
                 pa.placeOrder(this, _super, cardBin);

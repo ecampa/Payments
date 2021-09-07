@@ -1,33 +1,22 @@
 <?php
 namespace Payments\SecureAcceptance\Controller\Index;
 
-use Payments\SecureAcceptance\Gateway\Config\Config;
-use Magento\Framework\App\Action\Context;
-use Payments\SecureAcceptance\Helper\RequestDataBuilder;
-use Payments\SecureAcceptance\Helper\Vault;
-use Magento\Framework\Exception\LocalizedException;
-
 class LoadSilentData extends \Magento\Framework\App\Action\Action
 {
     /**
-     * @var RequestDataBuilder
-     */
-    protected $helper;
-
-    /**
-     * @var Config
+     * @var \Payments\SecureAcceptance\Gateway\Config\Config
      */
     protected $config;
 
     /**
-     * @var Vault
-     */
-    protected $vaultHelper;
-    
-    /**
      * \Magento\Framework\Controller\Result\JsonFactory
      */
     private $resultJsonFactory;
+
+    /**
+     * @var \Magento\Payment\Gateway\Command\CommandManagerInterface
+     */
+    private $commandManager;
 
     /**
      * @var \Magento\Framework\Data\Form\FormKey\Validator
@@ -35,26 +24,40 @@ class LoadSilentData extends \Magento\Framework\App\Action\Action
     private $formKeyValidator;
 
     /**
+     * @var \Magento\Framework\Session\SessionManager
+     */
+    private $sessionManager;
+
+    /**
+     * @var \Magento\Sales\Api\OrderRepositoryInterface
+     */
+    private $orderRepository;
+
+    /**
+     * @var \Payments\Core\Model\LoggerInterface
+     */
+    private $logger;
+
+    /**
      * LoadSilentData constructor.
-     * @param Context $context
-     * @param RequestDataBuilder $helper
-     * @param Config $config
-     * @param \Magento\Framework\Controller\Result\JsonFactory $resultJsonFactory
-     * @param Vault $vaultHelper
      */
     public function __construct(
-        Context $context,
-        \Payments\SecureAcceptance\Helper\RequestDataBuilder $helper,
+        \Magento\Framework\App\Action\Context $context,
         \Payments\SecureAcceptance\Gateway\Config\Config $config,
         \Magento\Framework\Controller\Result\JsonFactory $resultJsonFactory,
-        \Payments\SecureAcceptance\Helper\Vault $vaultHelper,
+        \Magento\Payment\Gateway\Command\CommandManagerInterface $commandManager,
+        \Magento\Framework\Session\SessionManager $sessionManager,
+        \Magento\Sales\Api\OrderRepositoryInterface $orderRepository,
+        \Payments\Core\Model\LoggerInterface $logger,
         \Magento\Framework\Data\Form\FormKey\Validator $formKeyValidator
     ) {
-        $this->helper = $helper;
+        parent::__construct($context);
         $this->config = $config;
         $this->resultJsonFactory = $resultJsonFactory;
-        $this->vaultHelper = $vaultHelper;
-        parent::__construct($context);
+        $this->commandManager = $commandManager;
+        $this->sessionManager = $sessionManager;
+        $this->orderRepository = $orderRepository;
+        $this->logger = $logger;
         $this->formKeyValidator = $formKeyValidator;
     }
 
@@ -66,36 +69,36 @@ class LoadSilentData extends \Magento\Framework\App\Action\Action
             return;
         }
 
-        $guestEmail = trim($this->_request->getParam('quoteEmail'));
-
-        if (empty($guestEmail) || $guestEmail == 'null') {
-            $guestEmail = null;
-        }
-
-        $cardType = $this->_request->getParam('cardType');
-        $this->vaultHelper->setVaultEnabled($this->_request->getParam('vaultIsEnabled'));
-
         $result = $this->resultJsonFactory->create();
-
-        if (!$this->formKeyValidator->validate($this->getRequest())) {
-            return $result->setData(['error' => __('Invalid formkey.')]);
-        }
-
-        if ($this->config->isTestMode()) {
-            $actionUrl = $this->config->getSopServiceUrlTest();
-        } else {
-            $actionUrl = $this->config->getSopServiceUrl();
-        }
-
         $data = [];
 
         try {
+            if (!$this->formKeyValidator->validate($this->getRequest())) {
+                throw new \Magento\Framework\Exception\LocalizedException(__('Invalid formkey.'));
+            }
+
+            $order = $this->orderRepository->get($this->sessionManager->getLastOrderId());
+
+            $commandResult = $this->commandManager->executeByCode(
+                'sop_request',
+                $order->getPayment(),
+                [
+                    'amount' => $order->getBaseTotalDue(),
+                    'card_type' => $this->getRequest()->getParam('cc_type'),
+                    'agreementIds' => $this->getRequest()->getParam('agreement'),
+                ]
+            );
+
             $data = [
-                'form_data' => $this->helper->buildSilentRequestData($guestEmail, null, $cardType),
-                'action_url' => $actionUrl . '/silent/pay'
+                'success' => true,
+                \Payments\SecureAcceptance\Model\Ui\ConfigProvider::CODE => ['fields' => $commandResult->get()],
             ];
+        } catch (\Magento\Framework\Exception\LocalizedException $e) {
+            $data['error_messages'] = $e->getMessage();
+            $this->logger->error($e->getMessage());
         } catch (\Exception $e) {
-            $data['error'] = $e->getMessage();
+            $data['error_messages'] = __('An error occurred.');
+            $this->logger->error($e->getMessage());
         }
 
         $result = $result->setData($data);

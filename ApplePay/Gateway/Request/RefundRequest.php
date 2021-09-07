@@ -16,7 +16,7 @@ class RefundRequest extends \Payments\ApplePay\Gateway\Request\AbstractRequest i
     public function build(array $buildSubject)
     {
         $payment = $this->getValidPaymentInstance($buildSubject);
-        $request = $this->requestDataBuilder->buildRefundRequestData($payment, $buildSubject['amount']);
+        $request = $this->requestDataBuilder->buildRefundRequestData($payment, $buildSubject['amount'], $buildSubject);
 
         return (array) $request;
     }

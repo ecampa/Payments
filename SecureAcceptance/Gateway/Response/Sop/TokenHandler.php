@@ -7,6 +7,7 @@ class TokenHandler implements \Magento\Payment\Gateway\Response\HandlerInterface
 {
 
     const KEY_PAYMENT_TOKEN = 'payment_token';
+    const KEY_PAYMENT_TOKEN_INSTRUMENT_IDENTIFIER_ID = 'payment_token_instrument_identifier_id';
 
     /**
      * @var \Payments\SecureAcceptance\Gateway\Helper\SubjectReader
@@ -66,14 +67,15 @@ class TokenHandler implements \Magento\Payment\Gateway\Response\HandlerInterface
     {
         $cardType = isset($response['req_card_type']) ? $response['req_card_type'] : '';
         $cardNumber = $response['req_card_number'];
-        $ccLastFour = "****-****-****-" . substr($cardNumber, -4);
+        $ccLastFour = substr($cardNumber, -4);
         $cardExpiry = isset($response['req_card_expiry_date']) ? $response['req_card_expiry_date'] : '';
 
         $result = [
-            'payment_token' => $response['payment_token'],
+            'payment_token' => $response[static::KEY_PAYMENT_TOKEN],
             'card_type' => $cardType,
             'cc_last4' => $ccLastFour,
-            'card_expiry_date' => $cardExpiry
+            'card_expiry_date' => $cardExpiry,
+            'instrument_id' => $response[self::KEY_PAYMENT_TOKEN_INSTRUMENT_IDENTIFIER_ID] ?? null,
         ];
 
         if (preg_match('/^([0-9]{6}).+/', $cardNumber, $matches)) {

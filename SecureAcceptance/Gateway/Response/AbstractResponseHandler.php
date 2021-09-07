@@ -140,14 +140,15 @@ abstract class AbstractResponseHandler
 
         $cardType = isset($response['req_card_type']) ? $response['req_card_type'] : '';
         $cardNumber = $response['req_card_number'];
-        $ccLastFour = "****-****-****-" . substr($cardNumber, -4);
+        $ccLastFour = substr($cardNumber, -4);
         $cardExpiry = isset($response['req_card_expiry_date']) ? $response['req_card_expiry_date'] : '';
 
         $result = [
             'payment_token' => $response['payment_token'],
             'card_type' => $cardType,
             'cc_last4' => $ccLastFour,
-            'card_expiry_date' => $cardExpiry
+            'card_expiry_date' => $cardExpiry,
+            'instrument_id' => $response['payment_token_instrument_identifier_id'] ?? null,
         ];
 
         if (preg_match('/^([0-9]{6}).+/', $cardNumber, $matches)) {

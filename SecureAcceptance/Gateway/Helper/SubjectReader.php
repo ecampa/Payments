@@ -30,4 +30,9 @@ class SubjectReader
     {
         return Helper\SubjectReader::readResponse($subject);
     }
+
+    public function readStateObject(array $subject)
+    {
+        return Helper\SubjectReader::readStateObject($subject);
+    }
 }

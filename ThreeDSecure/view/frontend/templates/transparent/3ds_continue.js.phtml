@@ -27,11 +27,25 @@ require(
         <?php endif; ?>
 
         $(parent).trigger('clearTimeout');
+        fullScreenLoader.startLoader();
+
         $.when(
             <?php if ($params['3ds_active'] ?? false): ?>
-            Cardinal.setup(),
+                    Cardinal.setup()
+                ).then(
             <?php endif; ?>
-            placeOrderAction(<?php echo json_encode($params['payload'] ?? []) ?>)
+            function () {
+                var deferred = $.Deferred();
+                placeOrderAction(<?php echo json_encode($params['payload'] ?? []) ?>).then(
+                    function (result) {
+                        deferred.resolve(result);
+                    },
+                    function (result) {
+                        deferred.reject(result);
+                    }
+                );
+                return deferred.promise();
+            }
         ).done(
             function () {
                 redirectOnSuccessAction.execute();

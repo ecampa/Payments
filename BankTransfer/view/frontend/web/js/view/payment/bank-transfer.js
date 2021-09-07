@@ -28,22 +28,6 @@ define(
                     code: 'payments_bank_transfer_bancontact',
                     template: 'Payments_BankTransfer/payment/bank-transfer'
                 }
-            },
-            {
-                type: 'payments_bank_transfer_eps',
-                component: 'Payments_BankTransfer/js/view/payment/method-renderer/bank-transfer',
-                config: {
-                    code: 'payments_bank_transfer_eps',
-                    template: 'Payments_BankTransfer/payment/bank-transfer'
-                }
-            },
-            {
-                type: 'payments_bank_transfer_giro',
-                component: 'Payments_BankTransfer/js/view/payment/method-renderer/bank-transfer',
-                config: {
-                    code: 'payments_bank_transfer_giro',
-                    template: 'Payments_BankTransfer/payment/bank-transfer'
-                }
             });
         
         return Component.extend({});

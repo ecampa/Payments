@@ -49,6 +49,11 @@ abstract class AbstractRequest
      */
     protected $subjectReader;
 
+    /**
+     * @var \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory
+     */
+    private $orderGridCollectionFactory;
+
 
     /**
      * @param Config $config
@@ -56,8 +61,10 @@ abstract class AbstractRequest
      * @param \Magento\Checkout\Model\Session $checkoutSession
      * @param \Magento\Customer\Model\Session $customerSession
      * @param OrderCollectionFactory $orderCollectionFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory
      * @param \Magento\Backend\Model\Auth $auth
      * @param GiftMessage $giftMessage
+     * @param SubjectReader $subjectReader
      */
     public function __construct(
         \Payments\ECheck\Gateway\Config\Config $config,
@@ -65,6 +72,7 @@ abstract class AbstractRequest
         \Magento\Checkout\Model\Session $checkoutSession,
         \Magento\Customer\Model\Session $customerSession,
         OrderCollectionFactory $orderCollectionFactory,
+        \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory,
         \Magento\Backend\Model\Auth $auth,
         GiftMessage $giftMessage,
         \Payments\ECheck\Gateway\Helper\SubjectReader $subjectReader
@@ -77,6 +85,7 @@ abstract class AbstractRequest
         $this->auth = $auth;
         $this->giftMessage = $giftMessage;
         $this->subjectReader = $subjectReader;
+        $this->orderGridCollectionFactory = $orderGridCollectionFactory;
     }
 
     /**
@@ -281,8 +290,10 @@ abstract class AbstractRequest
             $merchantDefinedData->field5 = round((time() - strtotime($this->customerSession->getCustomerData()->getCreatedAt())) / (3600*24));// Member Account Age (Days)
         }
 
-        $orders = $this->orderCollectionFactory->create()
-            ->addFieldToFilter('customer_email', $payment->getCustomerEmail());
+        $orders = $this->orderGridCollectionFactory->create()
+            ->addFieldToFilter('customer_email', $payment->getCustomerEmail())
+        ;
+        $orders->getSelect()->limit(1);
 
         $merchantDefinedData->field6 = (int)(count($orders) > 0); // Repeat Customer
         $merchantDefinedData->field20 = $payment->getCouponCode(); //Coupon Code

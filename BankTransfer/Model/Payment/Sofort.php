@@ -1,10 +1,8 @@
 <?php
 namespace Payments\BankTransfer\Model\Payment;
 
-use Payments\Core\Service\GatewaySoapApi;
+use Payments\BankTransfer\Service\SofortSoap;
 use Magento\Checkout\Model\Session;
-use Magento\Paypal\Model\Express\Checkout as ExpressCheckout;
-use Magento\Sales\Model\Order;
 
 /**
  * Class Config
@@ -38,6 +36,7 @@ class Sofort extends \Magento\Payment\Model\Method\AbstractMethod
      * @param \Magento\Payment\Helper\Data $paymentData
      * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
      * @param \Magento\Payment\Model\Method\Logger $logger
+     * @param array $gatewayAPI
      * @param \Magento\Framework\Model\ResourceModel\AbstractResource|null $resource
      * @param \Magento\Framework\Data\Collection\AbstractDb|null $resourceCollection
      * @param array $data
@@ -50,7 +49,7 @@ class Sofort extends \Magento\Payment\Model\Method\AbstractMethod
         \Magento\Payment\Helper\Data $paymentData,
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
         \Magento\Payment\Model\Method\Logger $logger,
-        \Payments\Core\Service\GatewaySoapApi $gatewayApi,
+        \Payments\BankTransfer\Service\SofortSoap $gatewayAPI,
         Session $checkoutSession,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
@@ -70,7 +69,7 @@ class Sofort extends \Magento\Payment\Model\Method\AbstractMethod
             $data
         );
         $this->storeManager = $storeManager;
-        $this->_gatewayAPI = $gatewayApi;
+        $this->_gatewayAPI = $gatewayAPI;
         $this->_checkoutSession = $checkoutSession;
     }
 

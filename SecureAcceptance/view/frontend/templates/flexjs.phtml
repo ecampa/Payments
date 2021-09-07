@@ -6,8 +6,13 @@
     require.config({
         paths: {
             "flex-microform": '<?php echo $block->isSandbox()
-                ? '{{testFlexUrl}}'
-                : '{{flexUrl}}'; ?>'
+                ? 'https://testflex.cybersource.com/cybersource/assets/microform/0.11/flex-microform.min'
+                : 'https://flex.cybersource.com/cybersource/assets/microform/0.11/flex-microform.min'; ?>'
+        },
+        shim: {
+            "flex-microform": {
+                exports: 'Flex'
+            }
         }
     });
 

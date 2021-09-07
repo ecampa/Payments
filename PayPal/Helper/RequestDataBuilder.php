@@ -47,6 +47,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
 
     /**
      * RequestDataBuilder constructor.
+     *
      * @param Context $context
      * @param StoreManagerInterface $storeManager
      * @param Config $config
@@ -58,8 +59,12 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
      * @param \Magento\Customer\Model\Session $customerSession
      * @param \Magento\Checkout\Helper\Data $data
      * @param \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $orderCollectionFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory
      * @param \Magento\Backend\Model\Auth $auth
      * @param \Magento\GiftMessage\Model\Message $giftMessage
+     *
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     public function __construct(
         Context $context,
@@ -73,6 +78,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         \Magento\Customer\Model\Session $customerSession,
         \Magento\Checkout\Helper\Data $data,
         \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $orderCollectionFactory,
+        \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory,
         \Magento\Backend\Model\Auth $auth,
         \Magento\GiftMessage\Model\Message $giftMessage
     ) {
@@ -82,6 +88,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
             $checkoutSession,
             $data,
             $orderCollectionFactory,
+            $orderGridCollectionFactory,
             $auth,
             $giftMessage
         );
@@ -311,8 +318,22 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
 
         $request->apCaptureService = $apCaptureService;
 
-        /** @var \Magento\Sales\Model\Order\Payment $payment */
-        $request = $this->buildRequestItems($payment->getOrder()->getAllItems(), $request);
+        $invoice = $payment->getInvoice();
+        if (!$invoice) {
+            $invoice = $payment->getCreatedInvoice();
+        }
+
+        $invoicedItems = [];
+        if ($invoice) {
+            /** @var \Magento\Sales\Model\Order\Invoice\Item $invoiceItem */
+            foreach ($invoice->getAllItems() as $invoiceItem) {
+                if ($invoiceItem->getQty() >= 1) {
+                    $invoicedItems[] = $invoiceItem;
+                }
+            }
+        }
+
+        $request = $this->buildRequestItems($invoicedItems, $request);
 
         $request->shipTo = $this->buildAddress($payment->getOrder()->getShippingAddress());
         $request->billTo = $this->buildAddress($payment->getOrder()->getBillingAddress());
@@ -498,11 +519,21 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
     {
         $index = 0;
         foreach ($items as $i => $item) {
-            $qty = $item->getQty();
-            if (empty($qty)) {
+
+            /** @var \Magento\Sales\Model\Order\Item $item */
+            $qty = (!empty($item->getQty()) ? $item->getQty() : $item->getQtyOrdered());
+
+            if (!empty($qty) && $qty == 0) {
+                continue;
+            }
+            else if(empty($qty)){
                 $qty = 1;
             }
-            $amount = ($item->getBasePrice() - ($item->getBaseDiscountAmount() / $qty));
+            
+            $amount = $item->getBasePrice() - ($item->getBaseDiscountAmount() / $qty);
+            if($amount < 0)
+                $amount = 0;
+
             $requestItem = new \stdClass();
             $requestItem->id = $i;
             $requestItem->productName = $item->getName();

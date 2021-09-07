@@ -31,6 +31,11 @@ class MicroformResponseValidator extends AbstractValidator
     private $signatureValidator;
 
     /**
+     * @var \Payments\SecureAcceptance\Model\Jwt\JwtProcessorInterface
+     */
+    private $jwtProcessor;
+
+    /**
      * @param ResultInterfaceFactory $resultFactory
      * @param \Payments\SecureAcceptance\Gateway\Config\Config $config
      * @param SubjectReader $subjectReader
@@ -40,6 +45,7 @@ class MicroformResponseValidator extends AbstractValidator
         ResultInterfaceFactory $resultFactory,
         \Payments\SecureAcceptance\Gateway\Config\Config $config,
         \Payments\SecureAcceptance\Gateway\Helper\SubjectReader $subjectReader,
+        \Payments\SecureAcceptance\Model\Jwt\JwtProcessorInterface $jwtProcessor,
         \Payments\SecureAcceptance\Gateway\Validator\Flex\SignatureValidator\ValidatorInterface $signatureValidator,
         $isAdminHtml = false
     ) {
@@ -48,6 +54,7 @@ class MicroformResponseValidator extends AbstractValidator
         $this->config = $config;
         $this->isAdminHtml = $isAdminHtml;
         $this->signatureValidator = $signatureValidator;
+        $this->jwtProcessor = $jwtProcessor;
     }
 
     /**
@@ -85,46 +92,14 @@ class MicroformResponseValidator extends AbstractValidator
             );
         }
 
-        $microformPublicKey = $payment->getAdditionalInformation('microformPublicKey');
-        $microformResponseData = $payment->getAdditionalInformation();
+        $jwt = $payment->getAdditionalInformation('flexJwt');
+        $microformPublicKey = $payment->getAdditionalInformation('microformPublicKey');;
 
-        $isValid = $this->verifyToken($microformPublicKey, $microformResponseData);
+        $isValid = $this->jwtProcessor->verifySignature($jwt, $microformPublicKey);
 
         return $this->createResult(
             $isValid,
             $isValid ? [] : ['Invalid token signature.']
         );
-    }
-
-    /**
-     * @param string $publicKey
-     * @param array $microformResponseData
-     * @return bool
-     */
-    private function verifyToken($publicKey, $microformResponseData)
-    {
-        $dataArray = [];
-
-        $signedFields = $microformResponseData[\Payments\SecureAcceptance\Observer\DataAssignObserver::KEY_FLEX_SIGNED_FIELDS] ?? null;
-
-        if (!$signedFields) {
-            throw new \InvalidArgumentException('Signature is missing.');
-        }
-
-        $signedFields = explode(',', $signedFields);
-
-        $signature = $microformResponseData[\Payments\SecureAcceptance\Observer\DataAssignObserver::KEY_FLEX_SIGNATURE] ?? null;
-
-        if (!$signature) {
-            throw new \InvalidArgumentException('Signature is missing.');
-        }
-
-        foreach ($signedFields as $v) {
-            $dataArray[] = $microformResponseData[$v] ?? null;
-        }
-
-        $dataString = implode(',', $dataArray);
-
-        return $this->signatureValidator->validate($dataString, $signature, $publicKey, "sha512");
     }
 }

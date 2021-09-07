@@ -27,20 +27,28 @@ define(
         return Component.extend({
             defaults: {
                 template: 'Payments_ApplePay/payment/applepay',
-                code: 'payments_applepay'
+                code: 'payments_applepay',
+                appleRequest: null,
+                grandTotalAmount: null
+            },
+            initObservable: function () {
+                this._super();
+                var that = this;
+
+                quote.totals.subscribe(function () {
+                    if (!that.isActive()) {
+                        return;
+                    }
+                    if (that.grandTotalAmount !== quote.totals()['base_grand_total']) {
+                        that.preparePaymentRequest();
+                    }
+                });
+
+                return this;
             },
             initialize: function () {
                 this._super();
-
-                this.appleRequest = null;
-                var me = this;
-
-                $.getJSON(urlBuilder.build('paymentsapple/index/request'), function(data){
-                    if (data.request) {
-                        me.appleRequest = data.request;
-                    }
-                });
-                return this;
+                this.preparePaymentRequest();
             },
             getCode: function () {
                 return 'payments_applepay';
@@ -50,6 +58,15 @@ define(
             },
             isActive: function () {
                 return window.checkoutConfig.payment[this.getCode()].active;
+            },
+            preparePaymentRequest: function () {
+                var that = this;
+                this.grandTotalAmount = quote.totals()['base_grand_total'];
+                $.getJSON(urlBuilder.build('paymentsapple/index/request'), function(data) {
+                    if (data.request) {
+                        that.appleRequest = data.request;
+                    }
+                });
             },
             validateMerchant: function(e) {
                 $.post(urlBuilder.build('paymentsapple/index/validate'), {

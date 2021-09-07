@@ -41,7 +41,7 @@ class CaptureResponseHandler extends \Payments\KlarnaFinancial\Gateway\Response\
         $payment = $this->getValidPaymentInstance($handlingSubject);
 
         $payment->setTransactionId($response[self::REQUEST_ID]);
-
+        $payment->setAdditionalInformation(self::CAPTURE_TRANSACTION_ID, $response[self::REQUEST_ID]);
         $payment->setIsTransactionClosed(1);
         $payment->setIsTransactionPending(false);
         $payment->setIsFraudDetected(false);

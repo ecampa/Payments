@@ -80,6 +80,9 @@ class Fieldset extends \Magento\Config\Block\System\Config\Form\Fieldset
                 $element
             ) . '" />';
         $html .= '<fieldset class="config admin__collapsible-block" id="' . $element->getHtmlId() . '"><br />';
+        $html .= '<div>
+        <img src="'.$this->getViewFileUrl('Payments_Core::assets/logo.png').'" />
+        </div>';
         $html .= '<legend>' . $element->getLegend().'</legend>';
         
         $html .= $this->_getHeaderCommentHtml($element);
@@ -95,10 +98,6 @@ class Fieldset extends \Magento\Config\Block\System\Config\Form\Fieldset
             Learn More…
             </a>
         </div>';
-        $html .= '<div>
-            <img src="'.$this->getViewFileUrl('Payments_Core::assets/logo.png').'" />
-        </div>';
-
         return $html;
     }
     

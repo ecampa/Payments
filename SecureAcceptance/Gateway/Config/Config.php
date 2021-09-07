@@ -40,59 +40,64 @@ class Config extends \Payments\Core\Model\AbstractGatewayConfig
     const KEY_VAULT_ENABLE = 'active';
     const KEY_VAULT_ADMIN_ENABLE = 'active_admin';
     const KEY_VAULT_ADMIN_ENABLE_CVV = 'enable_admin_cvv';
-    const KEY_MODE = 'sa_mode';
+    const KEY_FLOW_MODE = 'sa_flow_mode';
     const KEY_TOKEN_SKIP_DM = 'token_skip_decision_manager';
     const KEY_TOKEN_SKIP_AUTO_AUTH = 'token_skip_auto_auth';
+    const KEY_TOKEN_PASS_EXPIRATION_DATE = 'token_pass_expiration_date';
+    const KEY_CSRF_TOKEN_EXPIRATION_LIFE_TIME = 'csrf_token_expiration_lifetime';
+    const KEY_LOCALE = 'locale';
+    const SA_FLOW = 0;
+    const SOAP_FLOW = 1;
 
     /**
-     * @var bool
+     * @var \Magento\Framework\App\State
      */
-    private $isAdmin;
+    private $appState;
 
     /**
      * @param ScopeConfigInterface $scopeConfig
+     * @param \Magento\Framework\App\State $appState
      * @param string|null $methodCode
      * @param string $pathPattern
-     * @param Auth $auth
      */
     public function __construct(
         ScopeConfigInterface $scopeConfig,
+        \Magento\Framework\App\State $appState,
         $methodCode = null,
-        $pathPattern = self::DEFAULT_PATH_PATTERN,
-        $isAdmin = false
+        $pathPattern = self::DEFAULT_PATH_PATTERN
     ) {
         parent::__construct($scopeConfig, $methodCode, $pathPattern);
-        $this->isAdmin = $isAdmin;
+        $this->appState = $appState;
     }
 
-    public function getProfileId()
+    public function getProfileId($storeId = null)
     {
-        return $this->getValue(self::KEY_PROFILE_ID);
+        return $this->getValue(self::KEY_PROFILE_ID, $storeId);
     }
 
-    public function getSecretKey()
+    public function getSecretKey($storeId = null)
     {
-        return $this->getValue(self::KEY_SECRET_KEY);
+        return $this->getValue(self::KEY_SECRET_KEY, $storeId);
     }
 
-    public function getAccessKey()
+    public function getAccessKey($storeId = null)
     {
-        return $this->getValue(self::KEY_ACCESS_KEY);
+        return $this->getValue(self::KEY_ACCESS_KEY, $storeId);
     }
 
-    public function getSopProfileId()
+    public function getSopProfileId($storeId = null)
     {
-        return $this->getValue(self::KEY_SOP_PROFILE_ID);
+        return $this->getValue(self::KEY_SOP_PROFILE_ID, $storeId);
     }
 
-    public function getSopSecretKey()
+    public function getSopSecretKey($storeId = null)
     {
-        return $this->getValue(self::KEY_SOP_SECRET_KEY);
+        return $this->getValue(self::KEY_SOP_SECRET_KEY, $storeId);
     }
 
-    public function getSopAccessKey()
+    public function getSopAccessKey($storeId = null)
     {
-        return $this->getValue(self::KEY_SOP_ACCESS_KEY);
+        return $this->getValue(self::KEY_SOP_ACCESS_KEY, $storeId);
     }
 
     public function getSopServiceUrl()
@@ -203,12 +208,14 @@ class Config extends \Payments\Core\Model\AbstractGatewayConfig
         return $title;
     }
 
-    public function getIsLegacyMode()
+    public function getIsLegacyMode($storeId = null)
     {
-        if ($this->isAdmin) {
+        $flowType = $this->getValue(self::KEY_FLOW_MODE, $storeId);
+
+        if ($flowType == self::SA_FLOW || $this->isAdmin()) {
             return true;
         }
-        return $this->getValue(self::KEY_MODE);
+        return false;
     }
 
     public function isMicroform($storeId = null)
@@ -216,43 +223,83 @@ class Config extends \Payments\Core\Model\AbstractGatewayConfig
         return $this->getSaType($storeId) == \Payments\Core\Model\Source\SecureAcceptance\Type::SA_FLEX_MICROFORM;
     }
 
-    public function getAuthActive()
+    public function getAuthActive($storeId = null)
     {
-        return $this->getValue(self::KEY_AUTH_ACTIVE);
+        return $this->getValue(self::KEY_AUTH_ACTIVE, $storeId);
     }
 
-    public function getAuthProfileId()
+    public function getAuthProfileId($storeId = null)
     {
-        return $this->getAuthActive() ? $this->getValue(self::KEY_AUTH_PROFILE_ID) : $this->getProfileId();
+        return $this->getAuthActive($storeId)
+            ? $this->getValue(self::KEY_AUTH_PROFILE_ID)
+            : $this->getProfileId($storeId);
     }
 
-    public function getAuthSecretKey()
+    public function getAuthSecretKey($storeId = null)
     {
-        return $this->getAuthActive() ? $this->getValue(self::KEY_AUTH_SECRET_KEY) : $this->getSecretKey();
+        return $this->getAuthActive($storeId)
+            ? $this->getValue(self::KEY_AUTH_SECRET_KEY, $storeId)
+            : $this->getSecretKey($storeId);
     }
 
-    public function getAuthAccessKey()
+    public function getAuthAccessKey($storeId = null)
     {
-        return $this->getAuthActive() ? $this->getValue(self::KEY_AUTH_ACCESS_KEY) : $this->getAccessKey();
+        return $this->getAuthActive($storeId)
+            ? $this->getValue(self::KEY_AUTH_ACCESS_KEY)
+            : $this->getAccessKey($storeId);
     }
 
-    public function getSopAuthActive()
+    public function getSopAuthActive($storeId = null)
     {
-        return $this->getValue(self::KEY_SOP_AUTH_ACTIVE);
+        return $this->getValue(self::KEY_SOP_AUTH_ACTIVE, $storeId);
     }
 
-    public function getSopAuthProfileId()
+    public function getSopAuthProfileId($storeId = null)
     {
-        return $this->getSopAuthActive() ? $this->getValue(self::KEY_SOP_AUTH_PROFILE_ID) : $this->getSopProfileId();
+        return $this->getSopAuthActive($storeId)
+            ? $this->getValue(self::KEY_SOP_AUTH_PROFILE_ID)
+            : $this->getSopProfileId($storeId);
     }
 
-    public function getSopAuthSecretKey()
+    public function getSopAuthSecretKey($storeId = null)
     {
-        return $this->getSopAuthActive() ? $this->getValue(self::KEY_SOP_AUTH_SECRET_KEY) : $this->getSopSecretKey();
+        return $this->getSopAuthActive($storeId)
+            ? $this->getValue(self::KEY_SOP_AUTH_SECRET_KEY, $storeId)
+            : $this->getSopSecretKey($storeId);
     }
 
-    public function getSopAuthAccessKey()
+    public function getSopAuthAccessKey($storeId = null)
     {
-        return $this->getSopAuthActive() ? $this->getValue(self::KEY_SOP_AUTH_ACCESS_KEY) : $this->getSopAccessKey();
+        return $this->getSopAuthActive($storeId)
+            ? $this->getValue(self::KEY_SOP_AUTH_ACCESS_KEY)
+            : $this->getSopAccessKey($storeId);
+    }
+
+    /**
+     * @return bool
+     */
+    public function getTokenPassExpirationDate($storeId = null)
+    {
+        return (bool)$this->getValue(self::KEY_TOKEN_PASS_EXPIRATION_DATE, $storeId);
+    }
+
+    public function getCsrfTokenExpirationLifeTime()
+    {
+        return $this->getValue(self::KEY_CSRF_TOKEN_EXPIRATION_LIFE_TIME);
+    }
+
+    public function getLocale($storeId = null)
+    {
+        return $this->getValue(self::KEY_LOCALE, $storeId);
+    }
+
+    public function isAdmin()
+    {
+        try {
+            return $this->appState->getAreaCode() === \Magento\Framework\App\Area::AREA_ADMINHTML;
+        } catch (\Exception $e) {
+
+        }
+        return false;
     }
 }

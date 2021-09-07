@@ -50,26 +50,6 @@
                                                                         </item>
                                                                     </item>
                                                                 </item>
-                                                                <item name="payments_bank_transfer_eps" xsi:type="array">
-                                                                    <item name="component" xsi:type="string">Payments_BankTransfer/js/view/payment/bank-transfer</item>
-                                                                    <item name="methods" xsi:type="array">
-                                                                        <item name="payments_bank_transfer_eps" xsi:type="array">
-                                                                            <item name="isBillingAddressRequired" xsi:type="boolean">true</item>
-                                                                            <item name="template" xsi:type="string">Payments_BankTransfer/payment/bank-transfer</item>
-                                                                            <item name="code" xsi:type="string">payments_bank_transfer_eps</item>
-                                                                        </item>
-                                                                    </item>
-                                                                </item>
-                                                                <item name="payments_bank_transfer_giro" xsi:type="array">
-                                                                    <item name="component" xsi:type="string">Payments_BankTransfer/js/view/payment/bank-transfer</item>
-                                                                    <item name="methods" xsi:type="array">
-                                                                        <item name="payments_bank_transfer_giro" xsi:type="array">
-                                                                            <item name="template" xsi:type="string">Payments_BankTransfer/payment/bank-transfer</item>
-                                                                            <item name="code" xsi:type="string">payments_bank_transfer_giro</item>
-                                                                            <item name="isBillingAddressRequired" xsi:type="boolean">true</item>
-                                                                        </item>
-                                                                    </item>
-                                                                </item>
                                                             </item>
                                                         </item>
                                                     </item>

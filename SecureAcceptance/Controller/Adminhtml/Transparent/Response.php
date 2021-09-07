@@ -37,6 +37,11 @@ class Response extends \Payments\Core\Action\CsrfIgnoringAction
     private $config;
 
     /**
+     * @var \Payments\SecureAcceptance\Gateway\Config\SaConfigProviderInterface
+     */
+    private $configProvider;
+
+    /**
      * @var \Magento\Sales\Api\OrderRepositoryInterface
      */
     private $orderRepository;
@@ -84,6 +89,7 @@ class Response extends \Payments\Core\Action\CsrfIgnoringAction
         \Payments\SecureAcceptance\Helper\RequestDataBuilder $requestDataBuilder,
         \Magento\Quote\Api\CartRepositoryInterface $quoteRepository,
         \Payments\SecureAcceptance\Gateway\Config\Config $config,
+        \Payments\SecureAcceptance\Gateway\Config\SaConfigProviderInterface $configProvider,
         \Magento\Sales\Api\OrderRepositoryInterface $orderRepository,
         \Magento\Framework\Registry $coreRegistry,
         \Magento\Sales\Model\AdminOrder\Create $orderCreateModel,
@@ -98,6 +104,7 @@ class Response extends \Payments\Core\Action\CsrfIgnoringAction
         $this->requestDataBuilder = $requestDataBuilder;
         $this->quoteRepository = $quoteRepository;
         $this->config = $config;
+        $this->configProvider = $configProvider;
         $this->orderRepository = $orderRepository;
         $this->coreRegistry = $coreRegistry;
         $this->orderCreateModel = $orderCreateModel;
@@ -197,22 +204,6 @@ class Response extends \Payments\Core\Action\CsrfIgnoringAction
         return !$this->config->isSilent() && !$this->config->getUseIFrame();
     }
 
-    private function getSopSecretKey()
-    {
-        return $this->config->getValue(
-            \Payments\SecureAcceptance\Gateway\Config\Config::KEY_SOP_SECRET_KEY,
-            $this->orderCreateModel->getQuote()->getStoreId()
-        );
-    }
-
-    private function getSecretKey()
-    {
-        return $this->config->getValue(
-            \Payments\SecureAcceptance\Gateway\Config\Config::KEY_SECRET_KEY,
-            $this->orderCreateModel->getQuote()->getStoreId()
-        );
-    }
-
     /**
      * Validate response signature with secret key.
      *
@@ -221,9 +212,8 @@ class Response extends \Payments\Core\Action\CsrfIgnoringAction
      */
     private function isValidSignature($response)
     {
-        $transactionKey = $this->config->isSilent() ? $this->getSopSecretKey() : $this->getSecretKey();
-
-        return $this->requestDataBuilder->validateSignature($response, $transactionKey);
+        $storeId = $this->getRequest()->getParam('req_' . \Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_STORE_ID);
+        return $this->requestDataBuilder->validateSignature($response, $this->configProvider->getSecretKey($storeId));
     }
 
     /**

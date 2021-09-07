@@ -2,21 +2,29 @@
 namespace Payments\Core\Gateway\Request\Rest;
 
 
+use Payments\Core\Model\Config;
+
 class TimeIntervalBuilder implements \Magento\Payment\Gateway\Request\BuilderInterface
 {
 
-    const REPORT_INTERVAL = 24 * 3600;
+    const REPORT_INTERVAL = 23 * 3600;
     const DATE_FORMAT = 'c';
 
     /**
      * @var \Magento\Framework\Stdlib\DateTime\DateTime
      */
     private $dateTime;
+    /**
+     * @var Config
+     */
+    private $config;
 
     public function __construct(
-        \Magento\Framework\Stdlib\DateTime\DateTime $dateTime
+        \Magento\Framework\Stdlib\DateTime\DateTime $dateTime,
+        \Payments\Core\Model\Config $config
     ) {
         $this->dateTime = $dateTime;
+        $this->config = $config;
     }
 
     /**
@@ -25,14 +33,22 @@ class TimeIntervalBuilder implements \Magento\Payment\Gateway\Request\BuilderInt
     public function build(array $buildSubject)
     {
 
-        $gmtTimestamp = $this->dateTime->gmtTimestamp();
         $interval = $buildSubject['interval'] ?? static::REPORT_INTERVAL;
 
-        $startDateTime = $buildSubject['startTime']
-            ?? $this->dateTime->gmtDate(static::DATE_FORMAT, $gmtTimestamp - $interval);
+        if ($buildSubject['startTime'] != null) {
+            $startDateTime = $this->dateTime->gmtDate(static::DATE_FORMAT, $buildSubject['startTime']);
+            $calculatedStartTime = $this->dateTime->gmtTimestamp($startDateTime);
+            $endDateTime = $this->dateTime->gmtDate(static::DATE_FORMAT, $calculatedStartTime + $interval);
+        }
+        else {
+            $gmtTimestamp = $this->dateTime->gmtTimestamp();
 
-        $endDateTime = $buildSubject['endTime']
-            ?? $this->dateTime->gmtDate(static::DATE_FORMAT, $gmtTimestamp);
+            $startDateTime = $buildSubject['startTime']
+                ?? $this->dateTime->gmtDate(static::DATE_FORMAT, $gmtTimestamp - $interval);
+            $endDateTime = $buildSubject['endTime']
+                ?? $this->dateTime->gmtDate(static::DATE_FORMAT, $gmtTimestamp);
+        }
+
 
         return [
             'startTime' => $startDateTime,

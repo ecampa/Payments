@@ -21,11 +21,11 @@ class Type implements \Magento\Framework\Option\ArrayInterface
         return [
             [
                 'value' => self::SA_WEB,
-                'label' => __('Web / Mobile')
+                'label' => __('Hosted Checkout (formerly Web/Mobile)')
             ],
             [
                 'value' => self::SA_SOP,
-                'label' => __('Silent Order Post (SOP)')
+                'label' => __('Checkout API (formerly Silent Order Post/SOP)')
             ],
             [
                 'value' => self::SA_FLEX_MICROFORM,

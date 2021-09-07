@@ -12,6 +12,7 @@ use Magento\Payment\Gateway\Command\ResultInterface;
 use Magento\Payment\Gateway\Request\BuilderInterface;
 use Magento\Payment\Gateway\Http\TransferFactoryInterface;
 use Magento\Payment\Gateway\Command\Result\ArrayResultFactory;
+use Magento\Payment\Gateway\Response\HandlerInterface;
 use Magento\Payment\Gateway\Validator\ValidatorInterface;
 
 class GenerateKeyCommand implements CommandInterface
@@ -42,24 +43,32 @@ class GenerateKeyCommand implements CommandInterface
     private $client;
 
     /**
+     * @var HandlerInterface|null
+     */
+    private $handler;
+
+    /**
      * @param TransferFactoryInterface $transferFactory
      * @param ArrayResultFactory $arrayResultFactory
      * @param BuilderInterface $requestBuilder
      * @param ValidatorInterface $validator
      * @param ClientInterface $client
+     * @param HandlerInterface|null $handler
      */
     public function __construct(
         TransferFactoryInterface $transferFactory,
         ArrayResultFactory $arrayResultFactory,
         BuilderInterface $requestBuilder,
         ValidatorInterface $validator,
-        ClientInterface $client
+        ClientInterface $client,
+        HandlerInterface $handler = null
     ) {
         $this->transferFactory = $transferFactory;
         $this->arrayResultFactory = $arrayResultFactory;
         $this->requestBuilder = $requestBuilder;
         $this->validator = $validator;
         $this->client = $client;
+        $this->handler = $handler;
     }
 
     /**
@@ -83,6 +92,10 @@ class GenerateKeyCommand implements CommandInterface
 
         if (! $validationResult->isValid()) {
             throw new CommandException(__('Failed to generate flex key.'));
+        }
+
+        if ($this->handler !== null) {
+            $this->handler->handle($commandSubject, $response);
         }
 
         return $this->arrayResultFactory->create(['array' => $response]);

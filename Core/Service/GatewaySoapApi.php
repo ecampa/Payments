@@ -23,12 +23,12 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
      * @var \SoapClient
      */
     public $client;
-   
+
     /**
      * @var \Magento\Framework\HTTP\Client\Curl
      */
     private $curl;
-    
+
     /**
      * @var int
      */
@@ -38,7 +38,7 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
      * @var RequestDataBuilder
      */
     protected $requestDataHelper;
-    
+
     /**
      * @var bool $firstAttempt
      */
@@ -68,7 +68,7 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
      * @var \Magento\Directory\Model\Region
      */
     private $regionModel;
-    
+
     /**
      * @var \Magento\Framework\HTTP\PhpEnvironment\RemoteAddress
      */
@@ -78,7 +78,7 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
      * @var \Magento\Checkout\Model\Session
      */
     private $checkoutSession;
-    
+
     /**
      * @var OrderCollectionFactory
      */
@@ -222,9 +222,9 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
             $result = $this->client->runTransaction($request);
             $this->logger->debug([(array) $result]);
         } catch (\Exception $e) {
-           
+
             $this->logger->error($e->getMessage());
-             
+
         }
         return $result;
     }
@@ -305,9 +305,9 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
                 );
             }
         } catch (\SoapFault $soapFault) {
-           
+
             $this->logger->error($soapFault->getMessage());
-             
+
         }
 
         return $response;
@@ -345,15 +345,15 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
             $response = $this->client->runTransaction($request);
             $this->logger->debug([__METHOD__ => (array) $response]);
         } catch (\SoapFault $soapFault) {
-           
+
             $this->logger->error($soapFault->getMessage());
-             
+
             throw new LocalizedException(__($soapFault->getMessage()));
         }
 
         return $response;
     }
-    
+
     /**
      * Create profile from transaction
      *
@@ -372,9 +372,9 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
             }
             $result = $this->client->runTransaction($request);
         } catch (\Exception $e) {
-            
+
             $this->logger->error("convert error: " . $e->getMessage());
-             
+
         }
         return $result;
     }
@@ -702,104 +702,6 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
         return $data;
     }
 
-    /**
-     * @param \Magento\Quote\Model\Quote $quote
-     * @param $merchantId
-     * @param $store
-     * @param $bankCode
-     * @param null $deviceId
-     * @return array
-     */
-    public function bankTransferSale($quote, $merchantId, $store, $bankCode, $deviceId = null)
-    {
-        //for iDeal only
-        $paymentMethod = (in_array($bankCode, ['sofort', 'bancontact', 'eps', 'giro'])) ? $bankCode : 'ideal';
-  
-        $this->setBankTransferCredentials($paymentMethod);
-
-        $request = new \stdClass();
-        
-        $apSaleService = new \stdClass();
-        $apSaleService->run = 'true';
-        $apSaleService->cancelURL = $store->getBaseUrl() . 'paymentsbt/index/cancel';
-        $apSaleService->successURL = $store->getBaseUrl() . 'paymentsbt/index/success';
-        $apSaleService->failureURL = $store->getBaseUrl() . 'paymentsbt/index/failure';
-        
-        $request->merchantID = $merchantId;
-        $request->partnerSolutionID = \Payments\Core\Helper\RequestDataBuilder::PARTNER_SOLUTION_ID;
-        $developerId = $this->config->getValue(
-            "payment/payments_sa/developer_id",
-            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
-        );
-        if (!empty($developerId) || $developerId !== null) {
-            $request->developerId = $developerId;
-        }
-        $request->merchantReferenceCode = $quote->getReservedOrderId();
-        
-        switch ($bankCode) {
-            case 'sofort':
-                $request->apPaymentType = 'SOF';
-                break;
-            case 'bancontact':
-                $request->apPaymentType = 'MCH';
-                break;
-            case 'eps':
-                $request->apPaymentType = 'EPS';
-                break;
-            case 'giro':
-                $request->apPaymentType = 'GPY';
-                break;
-            default:
-                $request->apPaymentType = 'IDL';
-                $apSaleService->paymentOptionID = $bankCode;
-        }
-        
-        $request->apSaleService = $apSaleService;
-        
-        $purchaseTotals = new \stdClass();
-        $purchaseTotals->grandTotalAmount = $quote->getBaseGrandTotal();
-        $purchaseTotals->currency = $quote->getBaseCurrencyCode();
-        $request->purchaseTotals = $purchaseTotals;
-        
-        $invoiceHeader = new \stdClass();
-        $invoiceHeader->merchantDescriptor = 'Store Name';
-        $request->invoiceHeader = $invoiceHeader;
-
-        $request->billTo = $this->buildAddress($quote->getBillingAddress());
-
-        if ($quote->getShippingAddress()) {
-            $request->shipTo = $this->buildAddress($quote->getShippingAddress());
-        }
-
-        $request = $this->buildRequestItems($quote->getAllVisibleItems(), $request, $quote->getShippingAddress()->getShippingInclTax());
-
-        $request->merchantDefinedData = $this->buildDecisionManagerFields($quote);
-
-        if (!empty($deviceId)) {
-            $request->deviceFingerprintID = $deviceId;
-        }
-
-        $data = [];
-
-        try {
-            $this->initSoapClient();
-            $this->logger->debug([__METHOD__ => (array) $request]);
-            $result = $this->client->runTransaction($request);
-            $this->logger->debug([(array) $result]);
-
-            if (!empty($result) && $result->reasonCode == 100) {
-                $data['redirect_url'] = $result->apSaleReply->merchantURL;
-                $data['response'] = $result;
-            } else {
-                $data['redirect_url'] = $store->getBaseUrl() . 'paymentsbt/index/failure';
-            }
-        } catch (\Exception $e) {
-            $this->logger->error("bank transfer sale: " . $e->getMessage());
-            $data['error'] = $e->getMessage();
-        }
-
-        return $data;
-    }
 
     /**
      * @param $quoteAddress
@@ -819,7 +721,7 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
         $address->lastName = $quoteAddress->getLastname();
 
         if ($quoteAddress->getAddressType() == \Magento\Quote\Model\Quote\Address::TYPE_BILLING) {
-            $address->ipAddress = $this->requestDataHelper->getRemoteAddress();
+            //$address->ipAddress = $this->requestDataHelper->getRemoteAddress();
             $address->phoneNumber = $quoteAddress->getTelephone();
         }
 
@@ -949,109 +851,8 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
         return $merchantDefinedData;
     }
 
-    /**
-     * @param $merchantId
-     * @param $orderId
-     * @param $requestId
-     * @param $paymentMethod
-     * @return null
-     */
-    public function checkBankTransferStatus($merchantId, $orderId, $requestId, $paymentMethod)
-    {
-        $this->setBankTransferCredentials($paymentMethod);
-        
-        $request = new \stdClass();
-        $request->merchantID = $merchantId;
-        $request->partnerSolutionID = \Payments\Core\Helper\RequestDataBuilder::PARTNER_SOLUTION_ID;
-        $developerId = $this->config->getValue(
-            "payment/payments_sa/developer_id",
-            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
-        );
-        if (!empty($developerId) || $developerId !== null) {
-            $request->developerId = $developerId;
-        }
-        $request->merchantReferenceCode = $orderId;
-        switch ($paymentMethod) {
-            case 'sofort':
-                $request->apPaymentType = 'SOF';
-                break;
-            case 'bancontact':
-                $request->apPaymentType = 'MCH';
-                break;
-            default:
-                $request->apPaymentType = 'IDL';
-        }
-        $apCheckStatusService = new \stdClass();
-        $apCheckStatusService->run = 'true';
-        $apCheckStatusService->checkStatusRequestID = $requestId;
-        $request->apCheckStatusService = $apCheckStatusService;
-
-        $result = null;
-        try {
-            $this->initSoapClient();
-            $this->logger->debug([__METHOD__ => (array) $request]);
-            $result = $this->client->runTransaction($request);
-            $this->logger->debug([(array) $result]);
-        } catch (\Exception $e) {
-            $this->logger->error("check bank transfer status: " . $e->getMessage());
-        }
-        return $result;
-    }
-
-    /**
-     * @param $order
-     * @param $merchantId
-     * @param $requestId
-     * @param $paymentMethod
-     * @return null
-     */
-    public function bankTransferRefund($order, $merchantId, $requestId, $paymentMethod)
-    {
-        $this->setBankTransferCredentials($paymentMethod);
-        
-        $request = new \stdClass();
-        $request->merchantID = $merchantId;
-        $request->partnerSolutionID = \Payments\Core\Helper\RequestDataBuilder::PARTNER_SOLUTION_ID;
-        $developerId = $this->config->getValue(
-            "payment/payments_sa/developer_id",
-            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
-        );
-        if (!empty($developerId) || $developerId !== null) {
-            $request->developerId = $developerId;
-        }
-        $request->merchantReferenceCode = $order->getOrderIncrementId();
-        switch ($paymentMethod) {
-            case 'sofort':
-                $request->apPaymentType = 'SOF';
-                break;
-            case 'bancontact':
-                $request->apPaymentType = 'MCH';
-                break;
-            default:
-                $request->apPaymentType = 'IDL';
-        }
-        
-        $purchaseTotals = new \stdClass();
-        $purchaseTotals->grandTotalAmount = $order->getBaseGrandTotal();
-        $purchaseTotals->currency = $order->getBaseCurrencyCode();
-        $request->purchaseTotals = $purchaseTotals;
-        
-        $apRefundService = new \stdClass();
-        $apRefundService->run = 'true';
-        $apRefundService->refundRequestID = $requestId;
-        $request->apRefundService = $apRefundService;
-
-        $result = null;
-        try {
-            $this->initSoapClient();
-            $this->logger->debug([__METHOD__ => (array) $request]);
-            $result = $this->client->runTransaction($request);
-            $this->logger->debug([(array) $result]);
-        } catch (\Exception $e) {
-            $this->logger->error("check bank transfer status: " . $e->getMessage());
-        }
-        return $result;
-    }
+    
+    
 
     /**
      * @param $merchantId
@@ -1062,7 +863,7 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
      */
     public function checkAddress($merchantId, $reservedOrderId, array $shippingAddress, Address $billingAddress = null)
     {
-        
+
         $request = new \stdClass();
         $request->merchantID = $merchantId;
         $request->partnerSolutionID = \Payments\Core\Helper\RequestDataBuilder::PARTNER_SOLUTION_ID;
@@ -1074,7 +875,7 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
             $request->developerId = $developerId;
         }
         $request->merchantReferenceCode = $reservedOrderId;
-        
+
         if (!empty($billingAddress)) {
             $billTo = new \stdClass();
             $billTo->country = $billingAddress->getCountry();
@@ -1089,7 +890,7 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
             $billTo->city = $billingAddress->getCity();
             $request->billTo = $billTo;
         }
-        
+
         if (!empty($shippingAddress)) {
             $shipTo = new \stdClass();
             $shipTo->country = $shippingAddress['country'];
@@ -1107,7 +908,7 @@ class GatewaySoapApi extends \Payments\Core\Service\AbstractConnection
             $shipTo->phoneNumber = $shippingAddress['telephone'];
             $request->shipTo = $shipTo;
         }
-        
+
         $davService = new \stdClass();
         $davService->run = 'true';
         $request->davService = $davService;

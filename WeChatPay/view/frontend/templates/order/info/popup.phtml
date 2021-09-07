@@ -1,0 +1,15 @@
+<?php
+?>
+
+<div id="weChatPayQr" style="display: none;" data-bind="mageInit: {
+        'Payments_WeChatPay/js/view/payment/popup': {
+            checkStatusFrequency: <?= $block->getCheckStatusFrequency() ?>,
+            maxStatusRequests: <?= $block->getMaxStatusRequests() ?>,
+            popupMessageDelay: <?= $block->getPopupMessageDelay() ?>,
+            orderId: <?= $block->getOrder()->getEntityId() ?>
+        }}">
+    <div class="wechatpayqr-wrapper">
+        <div class="qr-wrapper"></div>
+        <div class="qr-notice"></div>
+    </div>
+</div>

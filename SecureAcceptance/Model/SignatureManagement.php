@@ -4,6 +4,7 @@ namespace Payments\SecureAcceptance\Model;
 
 class SignatureManagement implements \Payments\SecureAcceptance\Model\SignatureManagementInterface
 {
+    const SHA_256 = 'sha256';
 
     /**
      * @param $params
@@ -24,7 +25,7 @@ class SignatureManagement implements \Payments\SecureAcceptance\Model\SignatureM
      */
     public function sign($params, $secretKey)
     {
-        return base64_encode(hash_hmac('sha256', $this->buildDataToSign($params), $secretKey, true));
+        return base64_encode(hash_hmac(self::SHA_256, $this->buildDataToSign($params), $secretKey, true));
     }
 
     /**

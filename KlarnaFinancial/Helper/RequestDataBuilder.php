@@ -5,6 +5,7 @@ use Payments\Core\Helper\AbstractDataBuilder;
 use Magento\Checkout\Helper\Data as CheckoutHelper;
 use Payments\KlarnaFinancial\Gateway\Config\Config;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Quote\Model\Quote;
 use Magento\Sales\Model\Order;
 
 class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
@@ -15,6 +16,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
     const DEFAULT_BILL_TO_COUNTRY = 'US';
     const DEFAULT_BILL_TO_STATE = 'NY';
     const DEFAULT_BILL_TO_POSTCODE = '10001';
+    const CAPTURE_TRANSACTION_ID =  'CaptureTransactionId';
 
     /**
      * @var Config
@@ -57,6 +59,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
      * @param \Magento\Quote\Api\CartRepositoryInterface $quoteRepository
      * @param \Magento\Framework\Locale\Resolver $locale
      * @param \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $orderCollectionFactory
+     * @param \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory
      * @param \Magento\Backend\Model\Auth $auth
      * @param \Magento\GiftMessage\Model\Message $giftMessage
      * @param \Magento\Customer\Model\Address $address
@@ -72,6 +75,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         \Magento\Quote\Api\CartRepositoryInterface $quoteRepository,
         \Magento\Framework\Locale\Resolver $locale,
         \Magento\Sales\Model\ResourceModel\Order\CollectionFactory $orderCollectionFactory,
+        \Magento\Sales\Model\ResourceModel\Order\Grid\CollectionFactory $orderGridCollectionFactory,
         \Magento\Backend\Model\Auth $auth,
         \Magento\GiftMessage\Model\Message $giftMessage,
         \Magento\Customer\Model\Address $address
@@ -82,6 +86,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
             $checkoutSession,
             $checkoutHelper,
             $orderCollectionFactory,
+            $orderGridCollectionFactory,
             $auth,
             $giftMessage
         );
@@ -104,7 +109,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         $email = $quote->getCustomerEmail();
 
         $request = new \stdClass();
-        $request->merchantID = $this->gatewayConfig->getMerchantId();
+
         $request->merchantReferenceCode = $quote->getReservedOrderId();
 
         $request = $this->buildRequestItems($quote->getAllVisibleItems(), $request);
@@ -166,7 +171,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         $quote->collectTotals();
 
         $request = new \stdClass();
-        $request->merchantID = $this->gatewayConfig->getMerchantId();
+
         $request->merchantReferenceCode = $quote->getReservedOrderId();
 
         $request->billTo = $this->buildAddress($quote->getBillingAddress(), $email);
@@ -199,14 +204,12 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
      */
     public function buildCaptureRequestData(\Magento\Payment\Model\InfoInterface $payment, $amount)
     {
-        /** @var \Magento\Sales\Model\Order $order */
+        /** @var Order $order */
         $order = $payment->getOrder();
 
         $request = new \stdClass();
-        $request->merchantID = $this->gatewayConfig->getMerchantId();
-        $request->merchantReferenceCode = $order->getIncrementId();
 
-        $request = $this->buildRequestItems($order->getAllVisibleItems(), $request);
+        $request->merchantReferenceCode = $order->getIncrementId();
 
         $request->apPaymentType = self::PAYMENT_TYPE;
 
@@ -223,6 +226,23 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
 
         $request->apCaptureService = $apCaptureService;
 
+        $invoice = $payment->getInvoice();
+        if (!$invoice) {
+            $invoice = $payment->getCreatedInvoice();
+        }
+
+        $invoicedItems = [];
+        if ($invoice) {
+            /** @var \Magento\Sales\Model\Order\Invoice\Item $invoiceItem */
+            foreach ($invoice->getAllItems() as $invoiceItem) {
+                if ($invoiceItem->getQty() >= 1) {
+                    $invoicedItems[] = $invoiceItem;
+                }
+            }
+        }
+
+        $request = $this->buildRequestItems($invoicedItems, $request);
+
         return $request;
     }
 
@@ -232,11 +252,11 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
      */
     public function buildVoidRequestData(\Magento\Payment\Model\InfoInterface $payment)
     {
-        /** @var \Magento\Sales\Model\Order $order */
+        /** @var Order $order */
         $order = $payment->getOrder();
 
         $request = new \stdClass();
-        $request->merchantID = $this->gatewayConfig->getMerchantId();
+
         $request->merchantReferenceCode = $order->getIncrementId();
         $request->apPaymentType = self::PAYMENT_TYPE;
 
@@ -259,14 +279,14 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
      */
     public function buildRefundRequestData(\Magento\Payment\Model\InfoInterface $payment, $amount)
     {
-        /** @var \Magento\Sales\Model\Order $order */
+        /** @var Order $order */
         $order = $payment->getOrder();
 
         $request = new \stdClass();
-        $request->merchantID = $this->gatewayConfig->getMerchantId();
+
         $request->merchantReferenceCode = $order->getIncrementId();
 
-        $request = $this->buildRequestItems($order->getAllVisibleItems(), $request);
+        $request = $this->buildRequestItems($order->getAllVisibleItems(), $request, $order);
 
         $request->apPaymentType = self::PAYMENT_TYPE;
 
@@ -277,7 +297,8 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
 
         $apRefundService = new \stdClass();
         $apRefundService->run = "true";
-        $apRefundService->refundRequestID = $payment->getCcTransId();
+        $apRefundService->refundRequestID = $payment->getAdditionalInformation(self::CAPTURE_TRANSACTION_ID);
+
 
         $request->apRefundService = $apRefundService;
 
@@ -303,7 +324,7 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         }
 
         $address->email = $email;
-        $address->city =  $quoteAddress->getCity();
+        $address->city = $quoteAddress->getCity();
         $address->country = $quoteAddress->getCountryId();
         $address->postalCode = $quoteAddress->getPostcode();
         $address->district = $quoteAddress->getRegionCode();
@@ -347,22 +368,26 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
     /**
      * @param array $items
      * @param \stdClass $request
+     * @param null $order
      * @return mixed
+     * @throws LocalizedException
+     * @throws \Magento\Framework\Exception\NoSuchEntityException
      */
     private function buildRequestItems(array $items, \stdClass $request, $order = null)
     {
         $index = 0;
         foreach ($items as $i => $item) {
-            $qty = $item->getQty();
+            /** @var \Magento\Sales\Model\Order\Item $item */
+            $qty = (!empty($item->getQty()) ? $item->getQty() : $item->getQtyOrdered());
             if (empty($qty)) {
                 $qty = 1;
             }
-            $amount = ($item->getPrice() - ($item->getDiscountAmount() / $qty));
+            $amount = $item->getPrice();
             $requestItem = new \stdClass();
             $requestItem->id = $i;
             $requestItem->productName = $item->getName();
             $requestItem->productSKU = $item->getSku();
-            $requestItem->quantity = (int) $qty;
+            $requestItem->quantity = (int)$qty;
             $requestItem->productCode = 'default';
             $requestItem->unitPrice = $this->formatAmount($amount);
             $requestItem->taxAmount = $this->formatAmount($item->getTaxAmount());
@@ -371,23 +396,35 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
             $index = $i;
         }
 
-        $shippingCost = $this->checkoutSession->getQuote()->getShippingAddress()->getBaseShippingAmount();
+        /** @var Quote $quote */
+        $quote = $this->checkoutSession->getQuote();
 
-        /** @var \Magento\Sales\Model\Order $order */
-        if (!is_null($order)) {
-            $shippingCost = $order->getShippingAmount();
+        if (is_null($order)) {
+            $shippingAddress = $quote->getShippingAddress();
+            $shippingCost = $shippingAddress->getBaseShippingAmount();
+            $shippingCostTax = $shippingAddress->getBaseShippingTaxAmount();
+        }
+        else {
+            /** @var Order $order */
+            $shippingCost = $order->getBaseShippingAmount();
+            $shippingCostTax = $order->getBaseShippingTaxAmount();
         }
 
         $shippingCostItem = new \stdClass();
-        $shippingCostItem->id = $index + 1;
+        $shippingCostItem->id = ++$index;
         $shippingCostItem->productName = "shipping";
         $shippingCostItem->productSKU = "shipping";
-        $shippingCostItem->quantity = (int) 1;
+        $shippingCostItem->quantity = (int)1;
         $shippingCostItem->productCode = 'shipping';
         $shippingCostItem->unitPrice = $this->formatAmount($shippingCost);
-        $shippingCostItem->taxAmount = $this->formatAmount(0);
+        $shippingCostItem->taxAmount = $this->formatAmount($shippingCostTax);
         $shippingCostItem->totalAmount = $this->formatAmount($shippingCost);
         $request->item[] = $shippingCostItem;
+
+        if ($discountItem = $this->getDiscountItem($quote, $order)) {
+            $discountItem->id = ++$index;
+            $request->item[] = $discountItem;
+        }
 
         if (property_exists($request, 'item') && is_array($request->item)) {
             foreach ($request->item as $key => $item) {
@@ -400,5 +437,34 @@ class RequestDataBuilder extends \Payments\Core\Helper\AbstractDataBuilder
         }
 
         return $request;
+    }
+
+    private function getDiscountItem($quote, $order = null)
+    {
+
+        /** @var Order|Quote $object */
+        $object = $order ?? $quote;
+
+        if (!$object->getCouponCode()) {
+            return null;
+        }
+
+        if ($order != null) {
+            $discountAmount = $object->getBaseDiscountAmount();
+            $discountAmount = ($discountAmount < 0 ? $discountAmount * -1 : $discountAmount);
+        }
+        else {
+            $discountAmount = $object->getBaseSubtotal() - $object->getBaseSubtotalWithDiscount();
+        }
+
+        return (object)[
+            'productName' => $object->getCouponCode(),
+            'productSKU' => $object->getCouponCode(),
+            'quantity' => 1,
+            'productCode' => 'coupon',
+            'unitPrice' => $this->formatAmount($discountAmount),
+            'taxAmount' => 0,
+            'totalAmount' => $this->formatAmount($discountAmount),
+        ];
     }
 }

@@ -18,17 +18,21 @@ define([
                 dateDelim: null,
                 cardFieldsMap: null,
                 expireYearLength: 2,
+                appendPaymentData: false,
                 hiddenFormTmpl:
                     '<form action="<%= data.action %>" ' +
                     'method="POST" hidden ' +
                     'enctype="application/x-www-form-urlencoded" class="no-display"> ' +
                     '<% _.each(data.inputs, function(val, key){ %>' +
-                    '<input value="<%= val %>" name="<%= key %>" type="hidden"> ' +
+                    '<input value="<%- val %>" name="<%- key %>" type="hidden"> ' +
                     '<% }); %>' +
                     '</form>'
             },
-            _preparePaymentData: function(data) {
-                return data;
+            _preparePaymentData: function(data, ccfields) {
+                if (!this.options.appendPaymentData) {
+                    return data;
+                }
+                return this._super(data, ccfields);
             }
         });
 

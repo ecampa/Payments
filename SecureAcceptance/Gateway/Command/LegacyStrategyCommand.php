@@ -35,6 +35,11 @@ class LegacyStrategyCommand implements CommandInterface
     private $legacyCommand;
 
     /**
+     * @var bool
+     */
+    private $isAdmin;
+
+    /**
      * CaptureStrategyCommand constructor.
      * @param CommandPoolInterface $commandPool
      * @param SubjectReader $subjectReader
@@ -47,18 +52,23 @@ class LegacyStrategyCommand implements CommandInterface
         \Payments\SecureAcceptance\Gateway\Helper\SubjectReader $subjectReader,
         \Payments\SecureAcceptance\Gateway\Config\Config $config,
         string $command = null,
-        string $legacyCommand = null
+        string $legacyCommand = null,
+        bool $isAdmin = false
     ) {
         $this->commandPool = $commandPool;
         $this->subjectReader = $subjectReader;
         $this->config = $config;
         $this->command = $command;
         $this->legacyCommand = $legacyCommand;
+        $this->isAdmin = $isAdmin;
     }
 
     public function execute(array $commandSubject)
     {
-        if (!$this->config->getIsLegacyMode()) {
+        if (
+            !$this->isAdmin
+            && (!$this->config->getIsLegacyMode() || $this->config->isMicroform())
+        ) {
             $this->commandPool->get($this->command)->execute($commandSubject);
             return;
         }

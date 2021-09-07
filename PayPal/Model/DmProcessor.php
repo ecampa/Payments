@@ -6,9 +6,9 @@ class DmProcessor implements \Payments\Core\DM\TransactionProcessorInterface
 {
 
     /**
-     * @var \Payments\PayPal\Helper\RequestDataBuilder
+     * @var \Magento\Payment\Gateway\Request\BuilderInterface
      */
-    private $requestDataBuilder;
+    private $saleRequestBuilder;
 
     private $payPalSoapAPI;
 
@@ -38,8 +38,14 @@ class DmProcessor implements \Payments\Core\DM\TransactionProcessorInterface
     private $logger;
 
     /**
+     * @var \Magento\Payment\Gateway\Data\PaymentDataObjectFactory
+     */
+    private $paymentDataObjectFactory;
+
+    /**
      * DmProcessor constructor.
-     * @param \Payments\PayPal\Helper\RequestDataBuilder $requestDataBuilder
+     *
+     * @param \Magento\Payment\Gateway\Request\BuilderInterface $saleRequestBuilder
      * @param \Magento\Quote\Model\QuoteRepository $quoteRepository
      * @param \Magento\Sales\Api\TransactionRepositoryInterface $transactionRepository
      * @param \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder
@@ -47,7 +53,8 @@ class DmProcessor implements \Payments\Core\DM\TransactionProcessorInterface
      * @param \Payments\Core\Model\LoggerInterface $logger
      */
     public function __construct(
-        \Payments\PayPal\Helper\RequestDataBuilder $requestDataBuilder,
+        \Magento\Payment\Gateway\Request\BuilderInterface $saleRequestBuilder,
+        \Magento\Payment\Gateway\Data\PaymentDataObjectFactory $paymentDataObjectFactory,
         \Payments\PayPal\Service\GatewaySoapApi $payPalSoapAPI,
         \Magento\Quote\Model\QuoteRepository $quoteRepository,
         \Magento\Sales\Api\TransactionRepositoryInterface $transactionRepository,
@@ -55,7 +62,8 @@ class DmProcessor implements \Payments\Core\DM\TransactionProcessorInterface
         \Magento\Framework\Api\FilterBuilder $filterBuilder,
         \Payments\Core\Model\LoggerInterface $logger
     ) {
-        $this->requestDataBuilder = $requestDataBuilder;
+        $this->saleRequestBuilder = $saleRequestBuilder;
+        $this->paymentDataObjectFactory = $paymentDataObjectFactory;
         $this->payPalSoapAPI = $payPalSoapAPI;
         $this->quoteRepository = $quoteRepository;
         $this->transactionRepository = $transactionRepository;
@@ -81,7 +89,7 @@ class DmProcessor implements \Payments\Core\DM\TransactionProcessorInterface
             $quote->setStoreId($payment->getOrder()->getStoreId()); //set correct store_id for the quote
 
             if ($this->hasCaptureTransaction($payment)) {
-                $this->runSale($payment, $quote, $orderSetupTransactionId);
+                $this->runSale($payment, $quote);
             }
 
         } catch (\Exception $e) {
@@ -104,15 +112,18 @@ class DmProcessor implements \Payments\Core\DM\TransactionProcessorInterface
      * @return \Payments\PayPal\Model\DmProcessor
      * @throws \Exception
      */
-    private function runSale($payment, $quote, $orderSetupTransactionId)
+    private function runSale($payment, $quote)
     {
 
-        $saleRequest = $this->requestDataBuilder->buildSaleService($quote, $orderSetupTransactionId);
+        $saleRequest = $this->saleRequestBuilder->build(
+            [
+                'payment' => $this->paymentDataObjectFactory->create($payment)
+            ]
+        );
 
-        $saleRequest->decisionManager = new \stdClass();
-        $saleRequest->decisionManager->enabled = 'false'; // disable DM processing to settle this transaction properly
+        $saleRequest['decisionManager']['enabled'] = 'false'; // disable DM processing to settle this transaction properly
 
-        $result = (array)$this->payPalSoapAPI->saleService($saleRequest);
+        $result = (array)$this->payPalSoapAPI->saleService((object)$saleRequest);
 
         if (!$this->isValidResponse($result)) {
             return $this;

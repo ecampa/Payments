@@ -16,31 +16,7 @@ use Magento\Sales\Model\OrderRepository;
 class PlaceOrder extends \Payments\Core\Action\CsrfIgnoringAction
 {
     const LOCK_PREFIX = 'lock_req_';
-
-    /**
-     * @var \Magento\Checkout\Model\Session
-     */
-    private $checkoutSession;
-
-    /**
-     * @var \Magento\Quote\Model\QuoteManagement $quoteManagement
-     */
-    private $quoteManagement;
-
-    /**
-     * @var \Magento\Framework\View\Result\PageFactory
-     */
-    private $resultPageFactory;
-
-    /**
-     * @var RequestDataBuilder
-     */
-    private $requestDataBuilder;
-
-    /**
-     * @var \Magento\Quote\Api\CartRepositoryInterface
-     */
-    private $quoteRepository;
+    const COMMAND_CODE = 'sop_handle_response';
 
     /**
      * @var Config
@@ -53,11 +29,6 @@ class PlaceOrder extends \Payments\Core\Action\CsrfIgnoringAction
     private $orderRepository;
 
     /**
-     * @var \Magento\Framework\Registry
-     */
-    private $registry;
-
-    /**
      * @var LoggerInterface
      */
     private $logger;
@@ -68,24 +39,9 @@ class PlaceOrder extends \Payments\Core\Action\CsrfIgnoringAction
     private $storeManager;
 
     /**
-     * @var \Magento\Framework\Api\SearchCriteriaBuilder
-     */
-    private $searchCriteriaBuilder;
-
-    /**
-     * @var \Magento\Framework\Api\FilterBuilder
-     */
-    private $filterBuilder;
-
-    /**
      * @var \Payments\SecureAcceptance\Service\Lock
      */
     private $lock;
-
-    /**
-     * @var \Magento\Framework\Event\ManagerInterface
-     */
-    private $eventManager;
 
     /**
      * @var \Payments\Core\Model\Checkout\PaymentFailureRouteProviderInterface
@@ -93,60 +49,63 @@ class PlaceOrder extends \Payments\Core\Action\CsrfIgnoringAction
     private $paymentFailureRouteProvider;
 
     /**
+     * @var \Magento\Payment\Gateway\Command\CommandManagerInterface
+     */
+    private $commandManager;
+
+    /**
+     * @var \Payments\SecureAcceptance\Model\SignatureManagementInterface
+     */
+    private $signatureManagement;
+
+    /**
+     * @var \Magento\Sales\Model\Order\StatusResolver
+     */
+    private $statusResolver;
+
+    /**
+     * @var \Magento\Sales\Model\Order\Email\Sender\OrderSender
+     */
+    private $orderSender;
+
+    /**
      * PlaceOrder constructor.
      *
      * @param Context $context
-     * @param SessionManagerInterface $checkoutSession
-     * @param \Magento\Quote\Model\QuoteManagement $quoteManagement
-     * @param \Magento\Framework\View\Result\PageFactory $resultPageFactory
-     * @param RequestDataBuilder $requestDataBuilder
-     * @param \Magento\Quote\Api\CartRepositoryInterface $quoteRepository
+     * @param \Payments\SecureAcceptance\Model\SignatureManagementInterface $signatureManagement
+     * @param \Magento\Payment\Gateway\Command\CommandManagerInterface $commandManager
      * @param Config $config
      * @param \Payments\SecureAcceptance\Service\Lock $lock
      * @param OrderRepositoryInterface $orderRepository
-     * @param \Magento\Framework\Registry $registry
      * @param LoggerInterface $logger
      * @param \Magento\Store\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder
-     * @param \Magento\Framework\Api\FilterBuilder $filterBuilder
      * @param \Payments\Core\Model\Checkout\PaymentFailureRouteProviderInterface $paymentFailureRouteProvider
-     * @param \Magento\Framework\Event\ManagerInterface $eventManager
      */
     public function __construct(
         Context $context,
-        SessionManagerInterface $checkoutSession,
-        \Magento\Quote\Model\QuoteManagement $quoteManagement,
-        \Magento\Framework\View\Result\PageFactory $resultPageFactory,
-        \Payments\SecureAcceptance\Helper\RequestDataBuilder $requestDataBuilder,
-        \Magento\Quote\Api\CartRepositoryInterface $quoteRepository,
+        \Payments\SecureAcceptance\Model\SignatureManagementInterface $signatureManagement,
+        \Magento\Payment\Gateway\Command\CommandManagerInterface $commandManager,
         \Payments\SecureAcceptance\Gateway\Config\Config $config,
         \Payments\SecureAcceptance\Service\Lock $lock,
         OrderRepositoryInterface $orderRepository,
-        \Magento\Framework\Registry $registry,
         \Payments\Core\Model\LoggerInterface $logger,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
-        \Magento\Framework\Api\SearchCriteriaBuilder $searchCriteriaBuilder,
-        \Magento\Framework\Api\FilterBuilder $filterBuilder,
+        \Magento\Sales\Model\Order\StatusResolver $statusResolver,
         \Payments\Core\Model\Checkout\PaymentFailureRouteProviderInterface $paymentFailureRouteProvider,
-        \Magento\Framework\Event\ManagerInterface $eventManager
+        \Magento\Sales\Model\Order\Email\Sender\OrderSender $orderSender
     ) {
         parent::__construct($context);
 
-        $this->checkoutSession = $checkoutSession;
-        $this->quoteManagement = $quoteManagement;
-        $this->resultPageFactory = $resultPageFactory;
-        $this->requestDataBuilder = $requestDataBuilder;
-        $this->quoteRepository = $quoteRepository;
+        $this->signatureManagement = $signatureManagement;
+        $this->commandManager = $commandManager;
         $this->config = $config;
         $this->lock = $lock;
         $this->orderRepository = $orderRepository;
-        $this->registry = $registry;
         $this->logger = $logger;
         $this->storeManager = $storeManager;
-        $this->searchCriteriaBuilder = $searchCriteriaBuilder;
-        $this->filterBuilder = $filterBuilder;
-        $this->eventManager = $eventManager;
         $this->paymentFailureRouteProvider = $paymentFailureRouteProvider;
+        $this->statusResolver = $statusResolver;
+        $this->orderSender = $orderSender;
     }
 
     public function execute()
@@ -157,13 +116,6 @@ class PlaceOrder extends \Payments\Core\Action\CsrfIgnoringAction
             $this->_forward('TokenProcess', 'SecureAcceptance');
             return;
         }
-
-        $this->logger->debug(
-            [
-                'client' => static::class,
-                'response' => (array) $response
-            ]
-        );
 
         $resultUrl = $this->paymentFailureRouteProvider->getFailureRoutePath();
 
@@ -188,52 +140,32 @@ class PlaceOrder extends \Payments\Core\Action\CsrfIgnoringAction
                 return $this->processResponse($resultUrl);
             }
 
-            $quote = $this->getQuote();
+            $order = $this->getOrder();
 
-            if (!$quote->getIsActive()) {
-                $this->setSuccessOrder($quote);
-                return $this->processResponse('checkout/onepage/success');
-            }
+            $payment = $order->getPayment();
 
-            $quote->reserveOrderId();
-
-            if ($this->requestDataBuilder->getCheckoutMethod($quote) === Onepage::METHOD_GUEST) {
-                $quote->getBillingAddress()->setEmail($response['req_bill_to_email']);
-                $this->requestDataBuilder->prepareGuestQuote($quote);
-            }
-
-            $quote->setPaymentMethod(\Payments\SecureAcceptance\Model\Ui\ConfigProvider::CODE);
-            $quote->setInventoryProcessed(false);
-
-        // Set Sales Order Payment
-            $quote->getPayment()->importData(['method' => \Payments\SecureAcceptance\Model\Ui\ConfigProvider::CODE]);
-
-        // register response for command response handlers
-            $this->registry->register(\Payments\SecureAcceptance\Gateway\Request\AbstractRequest::TRANSPARENT_RESPONSE_KEY, $response);
-
-            $quote->collectTotals();
-            $this->quoteRepository->save($quote);
-
-            $this->checkoutSession->setLastSuccessQuoteId($quote->getId());
-            $this->checkoutSession->setLastQuoteId($quote->getId());
-            $this->checkoutSession->clearHelperData();
-
-            $order = $this->quoteManagement->submit($quote);
-            $this->eventManager->dispatch(
-                'payments_quote_submit_success',
-                [
-                    'order' => $order,
-                    'quote' => $quote
-                ]
+            $this->commandManager->executeByCode(
+                static::COMMAND_CODE,
+                $payment,
+                ['response' => $this->getRequest()->getParams()]
             );
-            $this->checkoutSession->setLastOrderId($order->getId());
-            $this->checkoutSession->setLastRealOrderId($order->getIncrementId());
-            $this->checkoutSession->setLastOrderStatus($order->getStatus());
+
+            if ($order->getState() == \Magento\Sales\Model\Order::STATE_PENDING_PAYMENT) {
+                $this->registerNotification($payment);
+                $this->orderRepository->save($order);
+                $this->orderSender->send($order);
+            }
 
             $this->messageManager->addSuccessMessage(__('Your order has been successfully created!'));
             $resultUrl = 'checkout/onepage/success';
         } catch (\Exception $e) {
             $this->messageManager->addExceptionMessage($e, $e->getMessage());
+
+            if ($order ?? null) {
+                $this->updateFailedState($order);
+                $this->orderRepository->save($order);
+            }
+
         } finally {
             $this->lock->releaseLock($this->getLockName());
         }
@@ -247,66 +179,15 @@ class PlaceOrder extends \Payments\Core\Action\CsrfIgnoringAction
         return $resultRedirect->setPath($resultUrl, ['_secure' => true]);
     }
 
-
-    /**
-     * @return \Magento\Quote\Model\Quote
-     * @throws \Magento\Framework\Exception\LocalizedException
-     */
-    private function getQuote()
+    private function getOrder()
     {
-        /** @var \Magento\Quote\Model\Quote $quote */
-        $quote = $this->checkoutSession->getQuote();
-
-        try {
-            if (!$quote->getId() && $quoteId = $this->getRequest()->getParam('req_' . \Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_QUOTE_ID)) {
-                $quote = $this->quoteRepository->get($quoteId);
-            }
-        } catch (\Magento\Framework\Exception\NoSuchEntityException $e) {
-
-        }
-
-        if (!$quote->getId() || $quote->getId() != $this->getRequest()->getParam('req_' . \Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_QUOTE_ID)) {
-            throw new \Magento\Framework\Exception\LocalizedException(__('Payment could not be processed.'));
-        }
-
-        return $quote;
-    }
-
-    /**
-     * @param \Magento\Quote\Model\Quote $quote
-     */
-    private function setSuccessOrder($quote)
-    {
-        $order = $this->getQuoteOrder($quote);
-
-        $this->checkoutSession->setLastSuccessQuoteId($quote->getId());
-        $this->checkoutSession->setLastQuoteId($quote->getId());
-        $this->checkoutSession->clearHelperData();
-        $this->checkoutSession->setLastOrderId($order->getId());
-        $this->checkoutSession->setLastRealOrderId($order->getIncrementId());
-        $this->checkoutSession->setLastOrderStatus($order->getStatus());
-        $this->messageManager->addSuccessMessage(__('Your order has been successfully created!'));
-    }
-
-    /**
-     * @param \Magento\Quote\Model\Quote $quote
-     * @return \Magento\Sales\Api\Data\OrderInterface
-     */
-    private function getQuoteOrder($quote)
-    {
-        $orderList = $this->orderRepository->getList(
-            $this->searchCriteriaBuilder->addFilters([
-                    $this->filterBuilder->setField('quote_id')->setValue($quote->getId())->create()
-                ])->create()
-        );
-
-        $orders = $orderList->getItems();
-
-        return array_shift($orders);
+        $orderId = $this->getRequest()->getParam('req_' . \Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_ORDER_ID);
+        return $this->orderRepository->get($orderId);
     }
 
     /**
      * @param $url
+     *
      * @return \Magento\Framework\Controller\ResultInterface
      */
     private function processResponse($url)
@@ -315,7 +196,8 @@ class PlaceOrder extends \Payments\Core\Action\CsrfIgnoringAction
                     <body>
                         <script type="text/javascript">
                             window.onload = function() {
-                                window.top.location.href = "'.$this->_url->getUrl($url, ['_scope' => $this->storeManager->getStore()->getId()]).'";
+                                window.top.location.href = "' . $this->_url->getUrl($url,
+                ['_scope' => $this->storeManager->getStore()->getId()]) . '";
                             };
                         </script>
                     </body>
@@ -335,10 +217,11 @@ class PlaceOrder extends \Payments\Core\Action\CsrfIgnoringAction
      *
      * Validates signature of request
      *
-     * @param $responses
+     * @param $response
+     *
      * @return bool
      */
-    private function isValidSignature($responses)
+    private function isValidSignature($response)
     {
         if ($this->config->isSilent()) {
             $transactionKey = $this->config->getSopAuthSecretKey();
@@ -346,6 +229,32 @@ class PlaceOrder extends \Payments\Core\Action\CsrfIgnoringAction
             $transactionKey = $this->config->getAuthSecretKey();
         }
 
-        return $this->requestDataBuilder->validateSignature($responses, $transactionKey);
+        return $this->signatureManagement->validateSignature($response, $transactionKey);
+    }
+
+    /**
+     * @param \Magento\Sales\Api\Data\OrderPaymentInterface $payment
+     *
+     * @throws \Magento\Framework\Exception\LocalizedException
+     */
+    private function registerNotification(\Magento\Sales\Api\Data\OrderPaymentInterface $payment)
+    {
+        $amount = $this->getRequest()->getParam('req_amount');
+
+        $payment->registerAuthorizationNotification($amount);
+
+        if (
+            $payment->getMethodInstance()->getConfigPaymentAction()
+            != \Magento\Payment\Model\Method\AbstractMethod::ACTION_AUTHORIZE_CAPTURE
+        ) {
+            return;
+        }
+
+        $payment->registerCaptureNotification($amount);
+    }
+
+    public function updateFailedState(\Magento\Sales\Api\Data\OrderInterface $order)
+    {
+        $order->cancel();
     }
 }

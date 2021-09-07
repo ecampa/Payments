@@ -27,6 +27,8 @@ define([
             }
 
             if (!this.isApplicableForCard(methodComponent.getCode(), cardType)) {
+                fullScreenLoader.stopLoader();
+                methodComponent.isPlaceOrderActionAllowed(true);
                 originalAction();
                 return;
             }
@@ -35,9 +37,10 @@ define([
             methodComponent.isPlaceOrderActionAllowed(false);
 
             if (this.setupDone) {
-                fullScreenLoader.stopLoader();
                 require(['Payments_ThreeDSecure/js/view/payment/cardinal'], function (Cardinal) {
                     Cardinal.binDetect(cardNumber).then(function () {
+                        fullScreenLoader.stopLoader();
+                        methodComponent.isPlaceOrderActionAllowed(true);
                         originalAction();
                     });
                 });
@@ -50,6 +53,7 @@ define([
                         function (sessionId) {
                             that.sessionId = sessionId;
                             fullScreenLoader.stopLoader();
+                            methodComponent.isPlaceOrderActionAllowed(true);
                             originalAction();
                             that.setupDone = true;
                         }.bind(methodComponent)
@@ -57,7 +61,7 @@ define([
                     .fail(
                         function () {
                             fullScreenLoader.stopLoader();
-                            methodComponent.isPlaceOrderActionAllowed(false);
+                            methodComponent.isPlaceOrderActionAllowed(true);
                         }.bind(methodComponent)
                     );
             });

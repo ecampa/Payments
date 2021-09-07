@@ -1,5 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <!-- Authorize command legacy -->
+    <virtualType name="PaymentsSAGatewayAuthorizeCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">Payments\SecureAcceptance\Gateway\Request\AuthorizationRequest</argument>
+            <argument name="handler" xsi:type="object">PaymentsSAAuthorizationHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\SecureAcceptance\Gateway\Validator\ResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\Client\SOAPClient</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+        </arguments>
+    </virtualType>
+
+    <!-- Sale command legacy -->
+    <virtualType name="PaymentsSASaleCommand" type="Magento\Payment\Gateway\Command\GatewayCommand">
+        <arguments>
+            <argument name="requestBuilder" xsi:type="object">PaymentsSASaleRequest</argument>
+            <argument name="handler" xsi:type="object">PaymentsSASaleHandler</argument>
+            <argument name="transferFactory" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\TransferFactory</argument>
+            <argument name="validator" xsi:type="object">Payments\SecureAcceptance\Gateway\Validator\ResponseCodeValidator</argument>
+            <argument name="client" xsi:type="object">Payments\SecureAcceptance\Gateway\Http\Client\SOAPClient</argument>
+            <argument name="errorMessageMapper" xsi:type="object">Payments\Core\Gateway\ErrorMapper\ConfigurableMapper</argument>
+        </arguments>
+    </virtualType>
+
     <type name="Payments\SecureAcceptance\Block\Info">
         <arguments>
             <argument name="data" xsi:type="array">
@@ -70,6 +95,12 @@
         </arguments>
     </type>
 
+    <type name="Payments\SecureAcceptance\Helper\Vault">
+        <arguments>
+            <argument name="checkoutSession" xsi:type="object">Magento\Backend\Model\Session\Quote\Proxy</argument>
+        </arguments>
+    </type>
+
     <virtualType name="PaymentsSAGatewaySoapVaultAuthorizeCommand" type="PaymentsSAGatewaySoapAuthorizeCommand">
         <arguments>
             <argument name="requestBuilder" xsi:type="object">PaymentsSAGatewaySoapVaultAuthorizeRequestBuilder</argument>
@@ -100,13 +131,19 @@
         </arguments>
     </virtualType>
 
-    <type name="Payments\SecureAcceptance\Gateway\Config\Config">
+    <type name="Payments\SecureAcceptance\Gateway\Config\CgiUrlHandler">
         <arguments>
             <argument name="isAdmin" xsi:type="boolean">true</argument>
         </arguments>
     </type>
 
     <type name="Payments\SecureAcceptance\Gateway\Validator\Flex\MicroformResponseValidator">
+        <arguments>
+            <argument name="isAdminHtml" xsi:type="boolean">true</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Gateway\Validator\Flex\CcTypeValidator">
         <arguments>
             <argument name="isAdminHtml" xsi:type="boolean">true</argument>
         </arguments>
@@ -122,5 +159,40 @@
             </argument>
         </arguments>
     </virtualType>
+
+    <type name="Payments\SecureAcceptance\Gateway\Request\Soap\DecisionManagerMddBuilder">
+        <arguments>
+            <argument name="checkoutSession" xsi:type="object">Magento\Backend\Model\Session\Quote</argument>
+        </arguments>
+    </type>
+
+    <type name="Payments\SecureAcceptance\Gateway\Command\LegacyStrategyCommand">
+        <arguments>
+            <argument name="isAdmin" xsi:type="boolean">true</argument>
+        </arguments>
+    </type>
+
+    <virtualType name="PaymentsSecureAcceptancePaymentTokenRepositoryPlugin" type="Payments\Core\Plugin\PaymentTokenRepositoryPlugin">
+        <arguments>
+            <argument name="checkoutSession" xsi:type="object">Magento\Backend\Model\Session\Quote\Proxy</argument>
+        </arguments>
+    </virtualType>
+
+    <type name="Payments\SecureAcceptance\Gateway\Response\Soap\CleanSessionHandler">
+        <arguments>
+            <argument name="sessionManager" xsi:type="object">Magento\Backend\Model\Session\Quote\Proxy</argument>
+        </arguments>
+    </type>
+
+    <type name="Magento\Vault\Api\PaymentTokenRepositoryInterface">
+        <plugin name="dummy-sa-payment-token-repository-plugin" type="Payments\Core\Plugin\PaymentTokenRepositoryPlugin"/>
+        <plugin name="sa-payment-token-repository-plugin" type="PaymentsSecureAcceptancePaymentTokenRepositoryPlugin"/>
+    </type>
+
+    <type name="Magento\Store\Api\StoreResolverInterface">
+        <plugin sortOrder="1" name="sa-store-resolver-plugin" type="Payments\SecureAcceptance\Plugin\Store\Api\StoreResolverInterfacePlugin" disabled="true"/>
+    </type>
+
+    <preference for="Payments\SecureAcceptance\Gateway\Config\SaConfigProviderInterface" type="Payments\SecureAcceptance\Gateway\Config\SaConfigProviderNonPa"/>
 
 </config>

@@ -4,8 +4,6 @@ namespace Payments\KlarnaFinancial\Controller\Index;
 use Magento\Framework\App\Action\Context;
 use Payments\KlarnaFinancial\Helper\RequestDataBuilder;
 use Payments\KlarnaFinancial\Service\GatewaySoapApi;
-use Magento\Framework\Session\SessionManagerInterface;
-use Magento\Quote\Model\QuoteManagement;
 use Magento\Framework\Controller\Result\JsonFactory;
 
 class Session extends \Magento\Framework\App\Action\Action
@@ -29,9 +27,9 @@ class Session extends \Magento\Framework\App\Action\Action
     private $customerSession;
 
     /**
-     * @var QuoteManagement
+     * @var \Magento\Quote\Api\CartRepositoryInterface
      */
-    private $quoteManagement;
+    private $cartRepository;
 
     /**
      * @var \Magento\Framework\App\Config\ScopeConfigInterface
@@ -45,11 +43,12 @@ class Session extends \Magento\Framework\App\Action\Action
 
     /**
      * LoadInfo constructor.
+     *
      * @param Context $context
      * @param RequestDataBuilder $helper
      * @param \Magento\Checkout\Model\Session $checkoutSession
      * @param \Magento\Customer\Model\Session $customerSession
-     * @param QuoteManagement $quoteManagement
+     * @param \Magento\Quote\Api\CartRepositoryInterface $cartRepository
      * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
      * @param JsonFactory $resultJsonFactory
      */
@@ -59,7 +58,7 @@ class Session extends \Magento\Framework\App\Action\Action
         \Payments\KlarnaFinancial\Service\GatewaySoapApi $gatewayApi,
         \Magento\Checkout\Model\Session $checkoutSession,
         \Magento\Customer\Model\Session $customerSession,
-        QuoteManagement $quoteManagement,
+        \Magento\Quote\Api\CartRepositoryInterface $cartRepository,
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
         JsonFactory $resultJsonFactory
     ) {
@@ -67,7 +66,7 @@ class Session extends \Magento\Framework\App\Action\Action
         $this->gatewayApi = $gatewayApi;
         $this->checkoutSession = $checkoutSession;
         $this->customerSession = $customerSession;
-        $this->quoteManagement = $quoteManagement;
+        $this->cartRepository = $cartRepository;
         $this->scopeConfig = $scopeConfig;
         $this->resultJsonFactory = $resultJsonFactory;
         parent::__construct($context);
@@ -82,6 +81,7 @@ class Session extends \Magento\Framework\App\Action\Action
 
         $quote->collectTotals();
         $quote->reserveOrderId();
+        $this->cartRepository->save($quote);
 
         if (! $quote->getCustomerId()) {
             $quote->setCustomerEmail($guestEmail);

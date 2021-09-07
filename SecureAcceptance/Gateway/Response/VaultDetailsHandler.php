@@ -13,7 +13,8 @@ use Magento\Sales\Api\Data\OrderPaymentExtensionInterfaceFactory;
 use Magento\Vault\Api\Data\PaymentTokenFactoryInterface;
 use Magento\Vault\Api\Data\PaymentTokenInterface;
 use Payments\SecureAcceptance\Helper\Vault;
-use Magento\Vault\Model\PaymentTokenManagement;
+use Payments\SecureAcceptance\Model\PaymentTokenManagement;
+use Magento\Vault\Api\PaymentTokenRepositoryInterface;
 use Magento\Vault\Model\Ui\VaultConfigProvider;
 
 class VaultDetailsHandler implements HandlerInterface
@@ -54,11 +55,17 @@ class VaultDetailsHandler implements HandlerInterface
     private $paymentTokenManagement;
 
     /**
+     * @var PaymentTokenRepositoryInterface
+     */
+    private $paymentTokenRepository;
+
+    /**
      * Constructor
      *
      * @param PaymentTokenFactoryInterface $paymentTokenFactory
      * @param OrderPaymentExtensionInterfaceFactory $paymentExtensionFactory
      * @param PaymentTokenManagement $paymentTokenManagement
+     * @param PaymentTokenRepositoryInterface $paymentTokenRepository
      * @param Config $config
      * @param SubjectReader $subjectReader
      * @param RequestDataBuilder $helper
@@ -67,7 +74,8 @@ class VaultDetailsHandler implements HandlerInterface
     public function __construct(
         PaymentTokenFactoryInterface $paymentTokenFactory,
         OrderPaymentExtensionInterfaceFactory $paymentExtensionFactory,
-        PaymentTokenManagement $paymentTokenManagement,
+        \Payments\SecureAcceptance\Model\PaymentTokenManagement $paymentTokenManagement,
+        PaymentTokenRepositoryInterface $paymentTokenRepository,
         \Payments\SecureAcceptance\Gateway\Config\Config $config,
         \Payments\SecureAcceptance\Gateway\Helper\SubjectReader $subjectReader,
         \Payments\SecureAcceptance\Helper\RequestDataBuilder $helper,
@@ -75,11 +83,13 @@ class VaultDetailsHandler implements HandlerInterface
     ) {
         $this->paymentTokenFactory = $paymentTokenFactory;
         $this->paymentExtensionFactory = $paymentExtensionFactory;
+        $this->paymentTokenManagement = $paymentTokenManagement;
+        $this->paymentTokenRepository = $paymentTokenRepository;
         $this->config = $config;
         $this->subjectReader = $subjectReader;
         $this->helper = $helper;
         $this->vaultHelper = $vaultHelper;
-        $this->paymentTokenManagement = $paymentTokenManagement;
+
     }
 
     /**
@@ -137,8 +147,17 @@ class VaultDetailsHandler implements HandlerInterface
             return $paymentToken;
         }
 
-        if (!$this->isTokenUnique($tokenData['payment_token'], $payment)) {
-            return null;
+        $instrumentId = $tokenData['instrument_id'] ?? null;
+        $customerId = $payment->getOrder()->getCustomerId();
+
+        if ($customerId
+            && $instrumentId
+            && $existingToken = $this->paymentTokenManagement->getCustomerTokenWithInstrumentIdentifier(
+                $customerId,
+                $instrumentId
+            )
+        ) {
+            $paymentToken = $existingToken;
         }
 
         $paymentToken->setGatewayToken($tokenData['payment_token']);
@@ -149,7 +168,9 @@ class VaultDetailsHandler implements HandlerInterface
             'incrementId' => $payment->getOrder()->getIncrementId(),
             'type' => $this->helper->getCardType($tokenData['card_type'], true),
             'maskedCC' => $tokenData['cc_last4'],
-            'expirationDate' => str_replace("-", "/", $tokenData['card_expiry_date'])
+            'expirationDate' => str_replace("-", "/", $tokenData['card_expiry_date']),
+            'merchantId' => $this->config->getMerchantId($payment->getOrder()->getStoreId()),
+            'instrumentIdentifierID' => $instrumentId,
         ];
 
         if (isset($tokenData['card_bin'])) {
@@ -157,6 +178,12 @@ class VaultDetailsHandler implements HandlerInterface
         }
 
         $paymentToken->setTokenDetails($this->convertDetailsToJSON($resultToken));
+
+        if ($paymentToken->getEntityId()) {
+            // Update exiting vault token subscriptionID and other details in this place.
+            // New tokens are saved in \Magento\Vault\Observer\AfterPaymentSaveObserver::execute method.
+            $this->paymentTokenRepository->save($paymentToken);
+        }
 
         return $paymentToken;
     }

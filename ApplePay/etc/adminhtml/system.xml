@@ -4,7 +4,7 @@
         <section id="payment">
             <group id="payments_section" translate="label" type="text" sortOrder="2" showInDefault="1" showInWebsite="1" showInStore="1">
                 <group id="payments_applepay" translate="label" type="text" sortOrder="80" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>ApplePay</label>
+                    <label>Apple Pay</label>
                     <field id="active" translate="label" type="select" sortOrder="0" showInDefault="1" showInWebsite="0" showInStore="1">
                         <label>Enabled</label>
                         <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>

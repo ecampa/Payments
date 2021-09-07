@@ -10,9 +10,21 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 class Config extends \Payments\Core\Model\AbstractGatewayConfig
 {
 
+    /**
+     * @var string
+     */
+    protected $_paymentMethod='ideal';
+
+    /**
+     * @var \Magento\Framework\App\Config\ScopeConfigInterface
+     */
+    protected $_scopeConfig;
+
     const KEY_TITLE = 'bank_transfer_title';
     
     const KEY_ACTIVE = 'bank_transfer_active';
+	
+	const KEY_USE_DEFAULT_MID = "use_default_mid";
     
     protected $method;
 
@@ -21,6 +33,7 @@ class Config extends \Payments\Core\Model\AbstractGatewayConfig
         $methodCode,
         $pathPattern
     ) {
+        $this->_scopeConfig = $scopeConfig;
         parent::__construct($scopeConfig, 'payments_bank_transfer', $pathPattern);
     }
 
@@ -48,4 +61,63 @@ class Config extends \Payments\Core\Model\AbstractGatewayConfig
     {
         return \Payments\BankTransfer\Model\Payment::CODE;
     }
-}
+	
+	
+
+    /**
+	 * get module Credentials
+     * @param $storeId
+	 * @return $value
+	 */
+    public function getModuleValue($field, $storeId = null)
+    { 
+		 
+		$value = $this->_scopeConfig->getValue(
+			"payment/payments_bank_transfer/".$this->_paymentMethod."_".$field,
+			\Magento\Store\Model\ScopeInterface::SCOPE_STORE
+		);
+        return $value;
+    }
+    
+    /**
+	 * get module merchant id
+	 * @param $storeId
+	 * @return merchantId|NULL
+	 */
+	public function getMerchantId($storeId = null)
+    {
+		$value = null;
+		$isDefaultMid = $this->isDefaultMid($storeId);
+		if(!$isDefaultMid){
+			$value = $this->getModuleValue(self::KEY_MERCHANT_ID, $storeId);
+		}
+		return $value;
+    }
+	
+	
+	/**
+	 * get module transaction key
+	 * @param $storeId
+	 * @return transactionKey|NULL
+	 */
+	public function getTransactionKey($storeId = null)
+    {
+		$value = null;
+		$isDefaultMid = $this->isDefaultMid($storeId);
+		if(!$isDefaultMid){ 
+			$value = $this->getModuleValue(self::KEY_TRANSACTION_KEY, $storeId);
+		}
+		return $value;
+    }
+
+    public function setBankTransferPaymentMethod($paymentMethod)
+    {
+        $this->_paymentMethod = $paymentMethod;
+    }
+	
+	public function isDefaultMid($storeId)
+	{
+       return $this->getModuleValue(self::KEY_USE_DEFAULT_MID,$storeId);
+    }
+
+} 

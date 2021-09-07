@@ -18,6 +18,11 @@ class CreateTokenRequest implements \Magento\Payment\Gateway\Request\BuilderInte
     private $gatewayConfig;
 
     /**
+     * @var \Payments\SecureAcceptance\Gateway\Config\SaConfigProviderInterface
+     */
+    private $configProvider;
+
+    /**
      * @var RequestDataBuilder
      */
     private $requestDataBuilder;
@@ -55,6 +60,7 @@ class CreateTokenRequest implements \Magento\Payment\Gateway\Request\BuilderInte
     public function __construct(
         \Payments\SecureAcceptance\Gateway\Helper\SubjectReader $subjectReader,
         \Payments\SecureAcceptance\Gateway\Config\Config $gatewayConfig,
+        \Payments\SecureAcceptance\Gateway\Config\SaConfigProviderInterface $configProvider,
         \Payments\SecureAcceptance\Helper\RequestDataBuilder $requestDataBuilder,
         \Magento\Framework\Locale\Resolver $localeResolver,
         \Magento\Framework\UrlInterface $urlBuilder,
@@ -65,6 +71,7 @@ class CreateTokenRequest implements \Magento\Payment\Gateway\Request\BuilderInte
     ) {
         $this->subjectReader = $subjectReader;
         $this->gatewayConfig = $gatewayConfig;
+        $this->configProvider = $configProvider;
         $this->requestDataBuilder = $requestDataBuilder;
         $this->localeResolver = $localeResolver;
         $this->urlBuilder = $urlBuilder;
@@ -92,8 +99,8 @@ class CreateTokenRequest implements \Magento\Payment\Gateway\Request\BuilderInte
         $order = $paymentDO->getOrder();
 
         $data = [];
-        $data['access_key'] = $this->getAccessKey();
-        $data['profile_id'] = $this->getProfileId();
+        $data['access_key'] = $this->configProvider->getAccessKey();
+        $data['profile_id'] = $this->configProvider->getProfileId();
         $data['transaction_uuid'] = $this->random->getUniqueHash();
 
         if ($unsignedFieldNames = $this->getUnsignedFieldNames()) {
@@ -105,9 +112,11 @@ class CreateTokenRequest implements \Magento\Payment\Gateway\Request\BuilderInte
         $data['reference_number'] = 'token_request_' . $order->getId();
         $data[\Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_QUOTE_ID] = $order->getId();
 
-        if ($this->gatewayConfig->isSilent()) {
-            $data[\Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_SID] = $this->encryptor->encrypt($this->checkoutSession->getSessionId());
-        }
+        $data[\Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_SID] = $this->encryptor->encrypt($this->checkoutSession->getSessionId());
+
+        $data[\Payments\SecureAcceptance\Helper\RequestDataBuilder::KEY_STORE_ID] = $this->checkoutSession->getStore()
+            ? $this->checkoutSession->getStore()->getId()
+            : $this->checkoutSession->getQuote()->getStoreId();
 
         $data['amount'] = '0.00';
         $data['currency'] = $order->getCurrencyCode();
@@ -118,6 +127,7 @@ class CreateTokenRequest implements \Magento\Payment\Gateway\Request\BuilderInte
         $data['bill_to_forename'] = $billingAddress->getFirstname();
         $data['bill_to_surname'] = $billingAddress->getLastname();
         $data['bill_to_email'] = $billingAddress->getEmail();
+        $data['bill_to_phone'] = $billingAddress->getTelephone();
         $data['bill_to_address_country'] = $billingAddress->getCountryId();
         $data['bill_to_address_city'] = $billingAddress->getCity();
         $data['bill_to_address_state'] = $billingAddress->getRegionCode();
@@ -153,7 +163,7 @@ class CreateTokenRequest implements \Magento\Payment\Gateway\Request\BuilderInte
 
         $data['signed_field_names'] = $this->requestDataBuilder->getSignedFields($data);
 
-        $data['signature'] = $this->requestDataBuilder->sign($data, $this->getSecretKey());
+        $data['signature'] = $this->requestDataBuilder->sign($data, $this->configProvider->getSecretKey());
         $data['card_type'] = $this->requestDataBuilder->getCardType($cardType);
 
         if ($data['card_type'] == 'undefined') {
@@ -163,41 +173,10 @@ class CreateTokenRequest implements \Magento\Payment\Gateway\Request\BuilderInte
         return $data;
     }
 
-    private function filterEmptyValues($data)
-    {
-        return array_filter($data, function ($value) {
-            return !empty($value);
-        });
-    }
-
-    private function getAccessKey()
-    {
-        if ($this->gatewayConfig->isSilent()) {
-            return $this->gatewayConfig->getSopAccessKey();
-        }
-        return $this->gatewayConfig->getAuthAccessKey();
-    }
-
-    private function getProfileId()
-    {
-        if ($this->gatewayConfig->isSilent()) {
-            return $this->gatewayConfig->getSopProfileId();
-        }
-        return $this->gatewayConfig->getAuthProfileId();
-    }
-
-    private function getSecretKey()
-    {
-        if ($this->gatewayConfig->isSilent()) {
-            return $this->gatewayConfig->getSopSecretKey();
-        }
-        return $this->gatewayConfig->getAuthSecretKey();
-    }
-
     private function getUnsignedFieldNames()
     {
         if ($this->gatewayConfig->isSilent()) {
-            $fieldNames = ['card_type','card_number','card_expiry_date'];
+            $fieldNames = ['card_type', 'card_number', 'card_expiry_date'];
 
             if (!$this->gatewayConfig->getIgnoreCvn()) {
                 $fieldNames[] = 'card_cvn';
@@ -207,5 +186,12 @@ class CreateTokenRequest implements \Magento\Payment\Gateway\Request\BuilderInte
         }
 
         return null;
+    }
+
+    private function filterEmptyValues($data)
+    {
+        return array_filter($data, function ($value) {
+            return !empty($value);
+        });
     }
 }

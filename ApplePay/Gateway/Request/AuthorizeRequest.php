@@ -12,7 +12,7 @@ class AuthorizeRequest extends \Payments\ApplePay\Gateway\Request\AbstractReques
     public function build(array $buildSubject)
     {
         $payment = $this->getValidPaymentInstance($buildSubject);
-        $request = $this->requestDataBuilder->buildAuthorizationRequestData($payment);
+        $request = $this->requestDataBuilder->buildAuthorizationRequestData($payment, $buildSubject);
 
         return (array) $request;
     }

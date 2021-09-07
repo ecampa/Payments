@@ -5,6 +5,15 @@ define([
     ],
     function ($) {
         $.widget('payments.transparent_iframe', $.mage.transparent, {
+            options: {
+                hiddenFormTmpl:
+                    '<form target="<%= data.target %>" action="<%= data.action %>" method="POST" ' +
+                    'hidden enctype="application/x-www-form-urlencoded" class="no-display">' +
+                    '<% _.each(data.inputs, function(val, key){ %>' +
+                    '<input value="<%- val %>" name="<%- key %>" type="hidden">' +
+                    '<% }); %>' +
+                    '</form>'
+            },
             _iFrameContainer: null,
             _preparePaymentData: function (data) {
                 return data;
@@ -16,6 +25,7 @@ define([
                     autoOpen: false,
                     buttons: [],
                     closed: this._closeIframe.bind(this),
+                    modalCloseBtnHandler: this._closeModalBtn.bind(this),
                     clickableOverlay: false
                 })
 
@@ -85,6 +95,13 @@ define([
                     this.options.context.iframeCloseHandler.bind(this.options.context)();
                 }
 
+            },
+            _closeModalBtn: function () {
+                if (this.options.context && this.options.context.iframeCloseBtnHandler) {
+                    this.options.context.iframeCloseBtnHandler.bind(this.options.context)();
+                    return;
+                }
+                this._iFrameContainer.modal('closeModal');
             }
         });
 

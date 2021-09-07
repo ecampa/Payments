@@ -38,7 +38,7 @@ class SoapReasonCodeValidator extends AbstractValidator
      */
     private function isSuccessfulTransaction(array $response)
     {
-        $reasonCode = $response[self::RESULT_CODE];
+        $reasonCode = (int)$response[self::RESULT_CODE];
         return ($reasonCode === self::APPROVED || $reasonCode === self::DM_REVIEW);
     }
 
@@ -48,7 +48,7 @@ class SoapReasonCodeValidator extends AbstractValidator
      */
     private function getExceptionReasonCode(array $response)
     {
-        $reasonCode = $response[self::RESULT_CODE];
+        $reasonCode = (int)$response[self::RESULT_CODE];
         if (\Payments\Core\Helper\ReasonCodeHandler::isError($reasonCode) || \Payments\Core\Helper\ReasonCodeHandler::isDeclined($reasonCode)) {
             return \Payments\Core\Helper\ReasonCodeHandler::getMessageForCode($reasonCode);
         }

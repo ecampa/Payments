@@ -1,9 +1,8 @@
 define([
     'jquery',
     'mage/utils/wrapper',
-    'Magento_Checkout/js/action/redirect-on-success',
     'Magento_Checkout/js/model/full-screen-loader'
-], function ($, wrapper,  redirectOnSuccessAction, fullScreenLoader) {
+], function ($, wrapper, fullScreenLoader) {
 
     'use strict';
 
@@ -33,8 +32,8 @@ define([
                     )
                         .then(
                             function (response) {
-                                require(['Magento_Checkout/js/action/place-order', 'Magento_Checkout/js/model/quote'],
-                                    function (placeOrderAction, quote) {
+                                require(['Magento_Checkout/js/action/place-order', 'Magento_Checkout/js/model/quote', 'Magento_Checkout/js/action/redirect-on-success'],
+                                    function (placeOrderAction, quote, redirectOnSuccessAction) {
                                         placeOrderAction({
                                             'method': getMethodCode(quote),
                                             'extension_attributes': {'cca_response': response}

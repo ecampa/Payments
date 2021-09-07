@@ -18,6 +18,11 @@
                     <source_model>Payments\Core\Model\Source\Country</source_model>
                     <depends><field id="tax_enabled">1</field></depends>
                 </field>
+                <field id="customer_tax_class_exclude" translate="label" type="multiselect" sortOrder="35" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
+                    <label>Customer Tax classes to exclude from Tax calculation</label>
+                    <source_model>Magento\Tax\Model\TaxClass\Source\Customer</source_model>
+                    <depends><field id="tax_enabled">1</field></depends>
+                </field>
                 <field id="ship_from_city" translate="label" sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="0" canRestore="1">
                     <label>Ship From City</label>
                     <depends><field id="tax_enabled">1</field></depends>

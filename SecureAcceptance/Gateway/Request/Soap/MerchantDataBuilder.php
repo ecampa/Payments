@@ -3,7 +3,7 @@
 
 namespace Payments\SecureAcceptance\Gateway\Request\Soap;
 
-use \Payments\SecureAcceptance\Gateway\Config\Config;
+use Payments\SecureAcceptance\Gateway\Config\Config;
 
 class MerchantDataBuilder implements \Magento\Payment\Gateway\Request\BuilderInterface
 {
@@ -45,7 +45,7 @@ class MerchantDataBuilder implements \Magento\Payment\Gateway\Request\BuilderInt
             $paymentDO->getOrder()->getStoreId()
         );
         $developerId = $this->gatewayConfig->getDeveloperId();
-        if (!empty($developerId) || $developerId !== null) {
+        if (!empty($developerId)) {
             $request['developerId'] = $developerId;
         }
 

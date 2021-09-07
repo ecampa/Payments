@@ -46,6 +46,7 @@ class SubscriptionBuilder implements \Magento\Payment\Gateway\Request\BuilderInt
             'recurringSubscriptionInfo' => [
                 'subscriptionID' => $token,
             ],
+            'subsequentAuthFirst' => 'true'
         ];
     }
 }

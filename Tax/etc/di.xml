@@ -1,6 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager:etc/config.xsd">
-    <preference for="Magento\Tax\Model\Sales\Total\Quote\Tax" type="Payments\Tax\Model\Tax\Sales\Total\Quote\Tax"/>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+
+    <type name="Magento\Tax\Api\TaxCalculationInterface">
+        <plugin name="tax-calculation-plugin" type="Payments\Tax\Plugin\Tax\Api\TaxCalculationInterfacePlugin"/>
+    </type>
+
+    <type name="Magento\Tax\Model\Sales\Total\Quote\CommonTaxCollector">
+        <plugin name="common-tax-collector-plugin" type="Payments\Tax\Plugin\Tax\Model\Sales\Total\Quote\CommonTaxCollectorPlugin"/>
+    </type>
+
+    <type name="Magento\Tax\Model\Sales\Total\Quote\Tax">
+        <plugin sortOrder="1" name="tax-quote-totals-plugin" type="Payments\Tax\Plugin\Tax\Model\Sales\Total\Quote\TaxPlugin"/>
+    </type>
+
+    <preference for="Payments\Tax\Service\TaxServiceInterface" type="Payments\Tax\Service\CachedTaxService"/>
+
+    <type name="Payments\Tax\Service\CachedTaxService">
+        <arguments>
+            <argument name="nonCachedTaxService" xsi:type="object">Payments\Tax\Service\GatewaySoapApi</argument>
+        </arguments>
+    </type>
 
     <!-- Tax logger configuration -->
     <virtualType name="PaymentsTaxLog" type="Payments\Core\Model\Logger">
@@ -20,13 +39,6 @@
     <type name="Payments\Tax\Service\GatewaySoapApi">
         <arguments>
             <argument name="logger" xsi:type="object">PaymentsTaxLog</argument>
-            <argument name="serializer" xsi:type="object">Payments\Core\Serialize\JsonObjectSerializer</argument>
-        </arguments>
-    </type>
-
-    <type name="Payments\Tax\Model\Tax\Sales\Total\Quote\Tax">
-        <arguments>
-            <argument name="serializer" xsi:type="object">Payments\Core\Serialize\JsonObjectSerializer</argument>
         </arguments>
     </type>
 

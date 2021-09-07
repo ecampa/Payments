@@ -13,6 +13,11 @@ class CvnBuilder implements \Magento\Payment\Gateway\Request\BuilderInterface
     private $subjectReader;
 
     /**
+     * @var \Magento\Framework\Session\SessionManagerInterface
+     */
+    private $session;
+
+    /**
      * @var \Payments\SecureAcceptance\Gateway\Config\Config
      */
     private $config;
@@ -24,10 +29,12 @@ class CvnBuilder implements \Magento\Payment\Gateway\Request\BuilderInterface
 
     public function __construct(
         \Payments\SecureAcceptance\Gateway\Helper\SubjectReader $subjectReader,
+        \Magento\Framework\Session\SessionManagerInterface $session,
         \Payments\SecureAcceptance\Gateway\Config\Config $config,
         string $isAdmin = null
     ) {
         $this->subjectReader = $subjectReader;
+        $this->session = $session;
         $this->config = $config;
         $this->isAdmin = $isAdmin;
     }
@@ -45,14 +52,7 @@ class CvnBuilder implements \Magento\Payment\Gateway\Request\BuilderInterface
         $paymentDO = $this->subjectReader->readPayment($buildSubject);
         $payment = $paymentDO->getPayment();
 
-        /** @var \Magento\Vault\Model\PaymentToken $vaultPaymentToken */
-        $vaultPaymentToken = $payment->getExtensionAttributes()->getVaultPaymentToken();
-
-        if ((is_null($vaultPaymentToken) || $vaultPaymentToken->isEmpty()) && !$this->config->isMicroform()) {
-            return [];
-        }
-
-        if (!$cvv = $payment->getAdditionalInformation('cvv')) {
+        if (!$cvv = $payment->getAdditionalInformation('cvv') ?? $this->session->getData('cvv')) {
             return [];
         }
 
@@ -64,7 +64,7 @@ class CvnBuilder implements \Magento\Payment\Gateway\Request\BuilderInterface
 
         $path = 'enable_' . $prefix . 'cvv';
 
-        if ($this->config->getValue($path)) {
+        if ($this->config->getValue($path) || !$this->config->isMicroform()) {
             $result['card']['cvNumber'] = $cvv;
         }
 

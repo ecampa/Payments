@@ -1,7 +1,6 @@
 <?php
 namespace Payments\BankTransfer\Controller\Index;
 
-use Payments\Core\Service\GatewaySoapApi;
 use Magento\Framework\App\Action\Context;
 use Magento\Checkout\Model\Session;
 use Magento\Store\Model\StoreManagerInterface;
@@ -18,7 +17,10 @@ class Pay extends \Magento\Framework\App\Action\Action
      */
     protected $_storeManager;
 
-    protected $gatewayApi;
+    /**
+     * @var array
+     */
+    protected $_gatewayAPI;
 
     /**
      * @var \Magento\Framework\App\Config\ScopeConfigInterface
@@ -39,6 +41,7 @@ class Pay extends \Magento\Framework\App\Action\Action
      * Pay constructor.
      * @param Context $context
      * @param Session $session
+     * @param array $gatewayAPI
      * @param StoreManagerInterface $storeManager
      * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
      * @param \Magento\Framework\Controller\Result\JsonFactory $resultJsonFactory
@@ -47,7 +50,7 @@ class Pay extends \Magento\Framework\App\Action\Action
     public function __construct(
         \Magento\Framework\App\Action\Context $context,
         Session $session,
-        \Payments\Core\Service\GatewaySoapApi $gatewayApi,
+        array $gatewayAPI,
         StoreManagerInterface $storeManager,
         \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
         \Magento\Framework\Controller\Result\JsonFactory $resultJsonFactory,
@@ -55,7 +58,7 @@ class Pay extends \Magento\Framework\App\Action\Action
     ) {
         $this->_session = $session;
         $this->_storeManager = $storeManager;
-        $this->gatewayApi = $gatewayApi;
+        $this->_gatewayAPI = $gatewayAPI;
         $this->scopeConfig = $scopeConfig;
         $this->resultJsonFactory = $resultJsonFactory;
         $this->formKeyValidator = $formKeyValidator;
@@ -90,21 +93,16 @@ class Pay extends \Magento\Framework\App\Action\Action
         
         $bankCode = $this->_request->getParam('bank');
         
-        $paymentMethod = (in_array($bankCode, ['sofort', 'bancontact', 'eps', 'giro'])) ? $bankCode : 'ideal';
+        $paymentMethod = (in_array($bankCode, ['sofort', 'bancontact'])) ? $bankCode : 'ideal';
 
-        $data = $this->gatewayApi->bankTransferSale(
+        $data = $this->_gatewayAPI[$paymentMethod]->bankTransferSale(
             $quote,
-            $this->scopeConfig->getValue(
-                "payment/payments_bank_transfer/".$paymentMethod."_merchant_id",
-                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
-            ),
             $this->_storeManager->getStore(),
             $bankCode,
             $this->_session->getData('fingerprint_id')
         );
         if (!empty($data['response'])) {
             $this->_session->setData('response', $data['response']);
-            $this->_session->setData('bank_payment_method', $paymentMethod);
             $quote->getPayment()->setAdditionalInformation('bank_payment_method', $paymentMethod)->save();
         }
         $result = $this->resultJsonFactory->create();
